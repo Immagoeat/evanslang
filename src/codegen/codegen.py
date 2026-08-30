@@ -13,6 +13,14 @@ from nodes.nodes import Program as AstProgram
 from ir.ir import Instruction, OpCode
 from ir.ir import Program as IrProgram
 
+BINARY_OPCODES = {
+    "==": OpCode.EQ,
+    "+": OpCode.ADD,
+    "-": OpCode.SUB,
+    "*": OpCode.MUL,
+    "/": OpCode.DIV,
+}
+
 
 class CodeGenerator:
     def generate(self, program: AstProgram) -> IrProgram:
@@ -106,11 +114,12 @@ class CodeGenerator:
                 Instruction(OpCode.INPUT),
             ]
         if isinstance(node, BinaryOp):
-            if node.operator != "==":
+            opcode = BINARY_OPCODES.get(node.operator)
+            if opcode is None:
                 raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
             return [
                 *self._generate_expression(node.left),
                 *self._generate_expression(node.right),
-                Instruction(OpCode.EQ),
+                Instruction(opcode),
             ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")

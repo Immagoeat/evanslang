@@ -58,6 +58,26 @@ class Lexer:
                 return Token(TokenType.EQUALS_EQUALS, "==", line, column)
             return Token(TokenType.EQUALS, "=", line, column)
 
+        if char == "+" and self._peek_char(1) == "=":
+            self._advance()
+            self._advance()
+            return Token(TokenType.PLUS_EQUALS, "+=", line, column)
+
+        if char == "-" and self._peek_char(1) == "=":
+            self._advance()
+            self._advance()
+            return Token(TokenType.MINUS_EQUALS, "-=", line, column)
+
+        if char == "*" and self._peek_char(1) == "=":
+            self._advance()
+            self._advance()
+            return Token(TokenType.STAR_EQUALS, "*=", line, column)
+
+        if char == "/" and self._peek_char(1) == "=":
+            self._advance()
+            self._advance()
+            return Token(TokenType.SLASH_EQUALS, "/=", line, column)
+
         if char == '"':
             return self._read_string()
 
@@ -103,6 +123,12 @@ class Lexer:
             value.append(self.source[self.pos])
             self._advance()
         return Token(TokenType.INT, "".join(value), line, column)
+
+    def _peek_char(self, offset: int) -> str | None:
+        index = self.pos + offset
+        if index < len(self.source):
+            return self.source[index]
+        return None
 
     def _skip_whitespace(self):
         while self.pos < len(self.source) and self.source[self.pos].isspace():

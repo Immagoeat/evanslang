@@ -42,7 +42,7 @@ in sync with the VM's behavior but is not currently wired into the CLI.
 |------|-----------------|
 | `src/lexer/` | `Token`/`TokenType`, and `Lexer` which turns source text into a token stream. |
 | `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `Assignment`, `InputCall`, `BinaryOp`, `IfStatement`, `StringLiteral`, `IntLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
-| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). `_parse_expression` handles an optional trailing `== primary` on top of `_parse_primary`; equality operands are not type-checked. `_parse_if_statement` parses the `if` branch, then loops on `elseif` and finally an optional `else`, sharing `_parse_block` (`{ statement* }`) across all three; `_skip_optional_semicolon` tolerates (but doesn't require) a `;` after any block. |
+| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). `_parse_expression` handles an optional trailing `== primary` on top of `_parse_primary`; equality operands are not type-checked. `_parse_if_statement` parses the `if` branch, then loops on `elseif` and finally an optional `else`, sharing `_parse_block` (`{ statement* }`) across all three; `_skip_optional_semicolon` tolerates (but doesn't require) a `;` after any block. `_parse_compound_assignment` desugars `NAME += expr;` (and `-=`/`*=`/`/=`) into a plain `Assignment(NAME, BinaryOp(op, Identifier(NAME), expr))` at parse time — the VM/interpreter never see a distinct "compound assignment" concept, only the `Assignment` + `BinaryOp` they already handle. |
 | `src/ir/` | `OpCode` enum and `Instruction`/`Program` (bytecode) types. |
 | `src/codegen/` | `CodeGenerator`: AST -> IR. |
 | `src/vm/` | `VM` (stack-based bytecode interpreter with a variable dict) and `bytecode_file` (binary serialization format for `--build`/`--run`). |
@@ -82,6 +82,7 @@ boundary, prints the message to stderr, and exits with status 1.
 | `INPUT` | Pop a prompt string, call `input(prompt)`, push the result. |
 | `PRINT` | Pop the stack and print it. |
 | `EQ` | Pop two values, push `left == right`. |
+| `ADD` / `SUB` / `MUL` / `DIV` | Pop `right` then `left`, push `left <op> right`. `DIV` uses integer (floor) division and raises `EvansLangError` on division by zero. |
 | `JUMP_IF_FALSE <offset>` | Pop a value; if falsy, add `offset` to the program counter (`offset` is relative to this instruction's own index, so `+1` means "the next instruction"). |
 | `JUMP <offset>` | Unconditionally add `offset` to the program counter. Emitted at the end of each `if`/`elseif` branch body to skip past the remaining branches and any `else` once a branch has run. |
 | `HALT` | Stop execution. |

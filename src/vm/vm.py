@@ -32,6 +32,24 @@ class VM:
                 right = self.stack.pop()
                 left = self.stack.pop()
                 self.stack.append(left == right)
+            elif instruction.opcode == OpCode.ADD:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(left + right)
+            elif instruction.opcode == OpCode.SUB:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(left - right)
+            elif instruction.opcode == OpCode.MUL:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(left * right)
+            elif instruction.opcode == OpCode.DIV:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                if right == 0:
+                    raise EvansLangError("Division by zero")
+                self.stack.append(left // right)
             elif instruction.opcode == OpCode.JUMP_IF_FALSE:
                 condition = self.stack.pop()
                 if not condition:

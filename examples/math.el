@@ -1,0 +1,10 @@
+var bob: int = 10;
+print(bob);
+bob += 3;
+print(bob);
+bob -= 3;
+print(bob);
+bob *= 3;
+print(bob);
+bob /= 3;
+print(bob);

@@ -51,3 +51,27 @@ def test_tokenizes_if_statement():
         TokenType.RBRACE,
         TokenType.EOF,
     ]
+
+
+def test_tokenizes_compound_assignment_operators():
+    tokens = Lexer("bob += 3; bob -= 3; bob *= 3; bob /= 3;").tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER,
+        TokenType.PLUS_EQUALS,
+        TokenType.INT,
+        TokenType.SEMICOLON,
+        TokenType.IDENTIFIER,
+        TokenType.MINUS_EQUALS,
+        TokenType.INT,
+        TokenType.SEMICOLON,
+        TokenType.IDENTIFIER,
+        TokenType.STAR_EQUALS,
+        TokenType.INT,
+        TokenType.SEMICOLON,
+        TokenType.IDENTIFIER,
+        TokenType.SLASH_EQUALS,
+        TokenType.INT,
+        TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]

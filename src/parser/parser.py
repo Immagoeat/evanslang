@@ -15,6 +15,13 @@ from utils.errors import ParseError
 
 VALID_TYPES = {"int", "str"}
 
+COMPOUND_OPERATORS = {
+    TokenType.PLUS_EQUALS: "+",
+    TokenType.MINUS_EQUALS: "-",
+    TokenType.STAR_EQUALS: "*",
+    TokenType.SLASH_EQUALS: "/",
+}
+
 
 class Parser:
     def __init__(self, tokens: list[Token]):
@@ -38,6 +45,8 @@ class Parser:
             return self._parse_if_statement()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
             return self._parse_assignment()
+        if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
+            return self._parse_compound_assignment()
         raise ParseError(
             f"Unexpected token {token.value!r}", token.line, token.column
         )
@@ -137,6 +146,46 @@ class Parser:
             )
         self._check_type(name_token, declared_type, value)
 
+        return Assignment(name_token.value, value)
+
+    def _parse_compound_assignment(self) -> Assignment:
+        name_token = self._expect(TokenType.IDENTIFIER)
+        op_token = self._advance()
+        operator = COMPOUND_OPERATORS[op_token.type]
+        rhs = self._parse_expression()
+        self._expect(TokenType.SEMICOLON)
+
+        declared_type = self.declared_types.get(name_token.value)
+        if declared_type is None:
+            raise ParseError(
+                f"Assignment to undeclared variable {name_token.value!r}",
+                name_token.line,
+                name_token.column,
+            )
+        if declared_type != "int":
+            raise ParseError(
+                f"Cannot use {op_token.value!r} on non-int variable {name_token.value!r}",
+                name_token.line,
+                name_token.column,
+            )
+        if isinstance(rhs, IntLiteral):
+            pass
+        elif isinstance(rhs, Identifier):
+            rhs_type = self.declared_types.get(rhs.name)
+            if rhs_type != "int":
+                raise ParseError(
+                    f"Cannot use {op_token.value!r} with non-int variable {rhs.name!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+        else:
+            raise ParseError(
+                f"Cannot use {op_token.value!r} with a non-int value",
+                name_token.line,
+                name_token.column,
+            )
+
+        value = BinaryOp(operator, Identifier(name_token.value), rhs)
         return Assignment(name_token.value, value)
 
     def _check_type(self, name_token: Token, type_name: str, value) -> None:

@@ -52,6 +52,35 @@ var bob: str;
 bob = "Hi";
 ```
 
+### compound assignment
+
+```
+<NAME> += <expression>;
+<NAME> -= <expression>;
+<NAME> *= <expression>;
+<NAME> /= <expression>;
+```
+
+Shorthand for `<NAME> = <NAME> <op> <expression>;`. Only valid on `int`
+variables; `<expression>` must be an integer literal or another `int`
+variable (both are compile-time (parse) errors otherwise). Division uses
+integer (floor) division; dividing by zero is a runtime error.
+
+```
+var bob: int = 10;
+bob += 3;
+print(bob);  // 13
+bob -= 3;
+print(bob);  // 10
+bob *= 3;
+print(bob);  // 30
+bob /= 3;
+print(bob);  // 10
+```
+
+(the `//` comments above are illustrative only — evanslang has no comment
+syntax yet, see "Not yet implemented" below)
+
 ### if / elseif / else
 
 ```
@@ -102,11 +131,14 @@ Currently supported expressions:
 - Identifiers (referencing a previously declared `var`)
 - `input("<prompt>")` — see below
 - Equality comparisons: `<expr> == <expr>` (used in `if` conditions)
+- Arithmetic (`+`, `-`, `*`, `/`) — currently only reachable through
+  compound assignment (`+=`, `-=`, `*=`, `/=`), not as a general infix
+  expression inside `print(...)` or elsewhere
 
-There is no arithmetic, no string concatenation, and no other comparison
-operators (`!=`, `<`, `>`, ...) yet. Equality comparison does not
-type-check its operands — comparing an `int` to a `str` is allowed and
-simply evaluates to `false` at runtime rather than being a parse error.
+There is no string concatenation and no comparison operators other than
+`==` (`!=`, `<`, `>`, ...) yet. Equality comparison does not type-check its
+operands — comparing an `int` to a `str` is allowed and simply evaluates to
+`false` at runtime rather than being a parse error.
 
 ### input
 
@@ -128,24 +160,25 @@ print(bob);
 ## Grammar (informal)
 
 ```
-program     := statement*
-statement   := printStmt | varDecl | assignment | ifStmt
-printStmt   := "print" "(" expression ")" ";"
-varDecl     := "var" IDENTIFIER ":" type ("=" expression)? ";"
-assignment  := IDENTIFIER "=" expression ";"
-ifStmt      := "if" "(" expression ")" block ";"?
-               ("elseif" "(" expression ")" block ";"?)*
-               ("else" block ";"?)?
-block       := "{" statement* "}"
-type        := "int" | "str"
-expression  := primary ("==" primary)?
-primary     := STRING | INT | IDENTIFIER | inputCall
-inputCall   := "input" "(" STRING ")"
+program        := statement*
+statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt
+printStmt      := "print" "(" expression ")" ";"
+varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
+assignment     := IDENTIFIER "=" expression ";"
+compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") (INT | IDENTIFIER) ";"
+ifStmt         := "if" "(" expression ")" block ";"?
+                  ("elseif" "(" expression ")" block ";"?)*
+                  ("else" block ";"?)?
+block          := "{" statement* "}"
+type           := "int" | "str"
+expression     := primary ("==" primary)?
+primary        := STRING | INT | IDENTIFIER | inputCall
+inputCall      := "input" "(" STRING ")"
 ```
 
 ## Not yet implemented
 
-- Arithmetic operators
+- Arithmetic as a general infix expression (only reachable via compound assignment right now)
 - Comparison operators other than `==` (`!=`, `<`, `>`, ...)
 - Boolean operators (`&&`, `||`, `!`)
 - `while` / `for` loops

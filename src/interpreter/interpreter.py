@@ -60,7 +60,19 @@ class Interpreter:
         if isinstance(node, InputCall):
             return input(self._evaluate(node.prompt))
         if isinstance(node, BinaryOp):
-            if node.operator != "==":
-                raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
-            return self._evaluate(node.left) == self._evaluate(node.right)
+            left = self._evaluate(node.left)
+            right = self._evaluate(node.right)
+            if node.operator == "==":
+                return left == right
+            if node.operator == "+":
+                return left + right
+            if node.operator == "-":
+                return left - right
+            if node.operator == "*":
+                return left * right
+            if node.operator == "/":
+                if right == 0:
+                    raise EvansLangError("Division by zero")
+                return left // right
+            raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
         raise NotImplementedError(f"Cannot evaluate node: {node!r}")

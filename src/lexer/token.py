@@ -13,6 +13,10 @@ class TokenType(Enum):
     COLON = auto()
     EQUALS = auto()
     EQUALS_EQUALS = auto()
+    PLUS_EQUALS = auto()
+    MINUS_EQUALS = auto()
+    STAR_EQUALS = auto()
+    SLASH_EQUALS = auto()
     EOF = auto()
 
 

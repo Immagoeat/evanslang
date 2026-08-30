@@ -157,3 +157,55 @@ def test_parses_if_without_elseif_or_else():
     if_stmt = program.statements[1]
     assert if_stmt.elif_branches == []
     assert if_stmt.else_body is None
+
+
+def test_parses_compound_assignment():
+    tokens = Lexer("var bob: int = 10;\nbob += 3;").tokenize()
+    program = Parser(tokens).parse()
+
+    assign = program.statements[1]
+    assert isinstance(assign, Assignment)
+    assert assign.name == "bob"
+    assert isinstance(assign.value, BinaryOp)
+    assert assign.value.operator == "+"
+    assert isinstance(assign.value.left, Identifier)
+    assert assign.value.left.name == "bob"
+    assert isinstance(assign.value.right, IntLiteral)
+    assert assign.value.right.value == 3
+
+
+def test_parses_all_compound_operators():
+    source = "var bob: int = 10;\nbob += 3;\nbob -= 3;\nbob *= 3;\nbob /= 3;\n"
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    operators = [stmt.value.operator for stmt in program.statements[1:]]
+    assert operators == ["+", "-", "*", "/"]
+
+
+def test_parses_compound_assignment_with_identifier_rhs():
+    tokens = Lexer("var a: int = 5;\nvar b: int = 3;\na += b;").tokenize()
+    program = Parser(tokens).parse()
+
+    assign = program.statements[2]
+    assert isinstance(assign.value, BinaryOp)
+    assert isinstance(assign.value.right, Identifier)
+    assert assign.value.right.name == "b"
+
+
+def test_rejects_compound_assignment_to_undeclared_variable():
+    tokens = Lexer("x += 1;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_compound_assignment_on_str_variable():
+    tokens = Lexer('var s: str = "hi";\ns += 1;').tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_compound_assignment_with_str_rhs():
+    tokens = Lexer('var n: int = 1;\nn += "x";').tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
