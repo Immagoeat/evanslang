@@ -35,3 +35,19 @@ def test_tokenizes_var_decl():
         TokenType.EOF,
     ]
     assert tokens[5].value == "9"
+
+
+def test_tokenizes_if_statement():
+    tokens = Lexer('if (bob == "Hi") {}').tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER,  # if
+        TokenType.LPAREN,
+        TokenType.IDENTIFIER,  # bob
+        TokenType.EQUALS_EQUALS,
+        TokenType.STRING,
+        TokenType.RPAREN,
+        TokenType.LBRACE,
+        TokenType.RBRACE,
+        TokenType.EOF,
+    ]

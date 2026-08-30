@@ -1,6 +1,8 @@
 from nodes.nodes import (
     Assignment,
+    BinaryOp,
     Identifier,
+    IfStatement,
     InputCall,
     IntLiteral,
     PrintStatement,
@@ -38,7 +40,21 @@ class CodeGenerator:
                 *self._generate_expression(node.value),
                 Instruction(OpCode.STORE, node.name),
             ]
+        if isinstance(node, IfStatement):
+            return self._generate_if(node)
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")
+
+    def _generate_if(self, node: IfStatement) -> list[Instruction]:
+        condition = self._generate_expression(node.condition)
+        body: list[Instruction] = []
+        for statement in node.body:
+            body.extend(self._generate_statement(statement))
+
+        # Offset is relative to the JUMP_IF_FALSE instruction itself: skip
+        # over the body (len(body)) plus the jump instruction (+1) to land
+        # on whatever comes right after the if-block.
+        jump_if_false = Instruction(OpCode.JUMP_IF_FALSE, len(body) + 1)
+        return [*condition, jump_if_false, *body]
 
     def _generate_expression(self, node) -> list[Instruction]:
         if isinstance(node, StringLiteral):
@@ -51,5 +67,13 @@ class CodeGenerator:
             return [
                 *self._generate_expression(node.prompt),
                 Instruction(OpCode.INPUT),
+            ]
+        if isinstance(node, BinaryOp):
+            if node.operator != "==":
+                raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
+            return [
+                *self._generate_expression(node.left),
+                *self._generate_expression(node.right),
+                Instruction(OpCode.EQ),
             ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")

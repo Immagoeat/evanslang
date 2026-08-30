@@ -7,6 +7,8 @@ import pytest
 
 from nodes.nodes import (
     Assignment,
+    BinaryOp,
+    IfStatement,
     InputCall,
     IntLiteral,
     PrintStatement,
@@ -89,5 +91,23 @@ def test_rejects_assignment_to_undeclared_variable():
 
 def test_rejects_input_assigned_to_int_variable():
     tokens = Lexer('var n: int;\nn = input("x");').tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_parses_if_statement():
+    tokens = Lexer('var bob: str = "Hi";\nif (bob == "Hi") {\nprint(bob);\n}').tokenize()
+    program = Parser(tokens).parse()
+
+    if_stmt = program.statements[1]
+    assert isinstance(if_stmt, IfStatement)
+    assert isinstance(if_stmt.condition, BinaryOp)
+    assert if_stmt.condition.operator == "=="
+    assert len(if_stmt.body) == 1
+    assert isinstance(if_stmt.body[0], PrintStatement)
+
+
+def test_rejects_unterminated_if_block():
+    tokens = Lexer('var x: int = 1;\nif (x == 1) {\nprint(x);\n').tokenize()
     with pytest.raises(ParseError):
         Parser(tokens).parse()

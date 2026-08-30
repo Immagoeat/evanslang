@@ -61,6 +61,25 @@ class PrintStatement(Node):
         return f"PrintStatement({self.argument!r})"
 
 
+class BinaryOp(Node):
+    def __init__(self, operator: str, left: Node, right: Node):
+        self.operator = operator
+        self.left = left
+        self.right = right
+
+    def __repr__(self):
+        return f"BinaryOp({self.operator!r}, {self.left!r}, {self.right!r})"
+
+
+class IfStatement(Node):
+    def __init__(self, condition: Node, body: list[Node]):
+        self.condition = condition
+        self.body = body
+
+    def __repr__(self):
+        return f"IfStatement({self.condition!r}, {self.body!r})"
+
+
 class Program(Node):
     def __init__(self, statements: list[Node]):
         self.statements = statements

@@ -41,8 +41,8 @@ in sync with the VM's behavior but is not currently wired into the CLI.
 | Path | Responsibility |
 |------|-----------------|
 | `src/lexer/` | `Token`/`TokenType`, and `Lexer` which turns source text into a token stream. |
-| `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `Assignment`, `InputCall`, `StringLiteral`, `IntLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
-| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). |
+| `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `Assignment`, `InputCall`, `BinaryOp`, `IfStatement`, `StringLiteral`, `IntLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
+| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). `_parse_expression` handles an optional trailing `== primary` on top of `_parse_primary`; equality operands are not type-checked. |
 | `src/ir/` | `OpCode` enum and `Instruction`/`Program` (bytecode) types. |
 | `src/codegen/` | `CodeGenerator`: AST -> IR. |
 | `src/vm/` | `VM` (stack-based bytecode interpreter with a variable dict) and `bytecode_file` (binary serialization format for `--build`/`--run`). |
@@ -81,9 +81,22 @@ boundary, prints the message to stderr, and exits with status 1.
 | `LOAD <name>` | Push the value of variable `name` (error if undefined). |
 | `INPUT` | Pop a prompt string, call `input(prompt)`, push the result. |
 | `PRINT` | Pop the stack and print it. |
+| `EQ` | Pop two values, push `left == right`. |
+| `JUMP_IF_FALSE <offset>` | Pop a value; if falsy, add `offset` to the program counter (`offset` is relative to this instruction's own index, so `+1` means "the next instruction"). |
+| `JUMP <offset>` | Unconditionally add `offset` to the program counter. Not currently emitted by codegen (reserved for `else`/loops). |
 | `HALT` | Stop execution. |
 
 `var NAME: type;` (no initializer) generates no instructions — the variable
 has no entry in the VM's `variables` dict until an `Assignment` (`STORE`)
 actually runs. Reading it before that point behaves the same as reading any
 other undefined variable (`LOAD` raises `EvansLangError`).
+
+### if-statement codegen
+
+`CodeGenerator._generate_if` lays out `[condition..., JUMP_IF_FALSE, body...]`
+with the jump's offset set to `len(body) + 1`, so a false condition skips
+straight past the body to whatever follows. Because the offset is computed
+relative to the jump instruction itself (not the start of the if), nested
+`if` blocks compose correctly without any global position bookkeeping in
+codegen. The VM's `run()` loop uses an explicit program counter (`pc`) rather
+than iterating instructions directly, specifically to support these jumps.

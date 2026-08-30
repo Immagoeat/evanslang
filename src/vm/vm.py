@@ -9,7 +9,10 @@ class VM:
         self.variables = {}
 
     def run(self, program: IrProgram):
-        for instruction in program.instructions:
+        pc = 0
+        instructions = program.instructions
+        while pc < len(instructions):
+            instruction = instructions[pc]
             if instruction.opcode == OpCode.PUSH_CONST:
                 self.stack.append(instruction.operand)
             elif instruction.opcode == OpCode.STORE:
@@ -25,7 +28,20 @@ class VM:
                 self.stack.append(input(prompt))
             elif instruction.opcode == OpCode.PRINT:
                 print(self.stack.pop())
+            elif instruction.opcode == OpCode.EQ:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(left == right)
+            elif instruction.opcode == OpCode.JUMP_IF_FALSE:
+                condition = self.stack.pop()
+                if not condition:
+                    pc += instruction.operand
+                    continue
+            elif instruction.opcode == OpCode.JUMP:
+                pc += instruction.operand
+                continue
             elif instruction.opcode == OpCode.HALT:
                 return
             else:
                 raise NotImplementedError(f"Unknown opcode: {instruction.opcode}")
+            pc += 1

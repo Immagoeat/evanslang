@@ -1,6 +1,8 @@
 from nodes.nodes import (
     Assignment,
+    BinaryOp,
     Identifier,
+    IfStatement,
     InputCall,
     IntLiteral,
     PrintStatement,
@@ -30,6 +32,11 @@ class Interpreter:
         if isinstance(node, Assignment):
             self.variables[node.name] = self._evaluate(node.value)
             return
+        if isinstance(node, IfStatement):
+            if self._evaluate(node.condition):
+                for statement in node.body:
+                    self._execute(statement)
+            return
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 
     def _evaluate(self, node):
@@ -43,4 +50,8 @@ class Interpreter:
             return self.variables[node.name]
         if isinstance(node, InputCall):
             return input(self._evaluate(node.prompt))
+        if isinstance(node, BinaryOp):
+            if node.operator != "==":
+                raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
+            return self._evaluate(node.left) == self._evaluate(node.right)
         raise NotImplementedError(f"Cannot evaluate node: {node!r}")

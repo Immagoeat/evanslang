@@ -7,9 +7,12 @@ class TokenType(Enum):
     INT = auto()
     LPAREN = auto()
     RPAREN = auto()
+    LBRACE = auto()
+    RBRACE = auto()
     SEMICOLON = auto()
     COLON = auto()
     EQUALS = auto()
+    EQUALS_EQUALS = auto()
     EOF = auto()
 
 

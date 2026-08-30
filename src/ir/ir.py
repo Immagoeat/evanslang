@@ -7,6 +7,9 @@ class OpCode(Enum):
     STORE = auto()
     INPUT = auto()
     PRINT = auto()
+    EQ = auto()
+    JUMP_IF_FALSE = auto()
+    JUMP = auto()
     HALT = auto()
 
 

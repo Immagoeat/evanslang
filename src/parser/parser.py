@@ -1,6 +1,8 @@
 from nodes.nodes import (
     Assignment,
+    BinaryOp,
     Identifier,
+    IfStatement,
     InputCall,
     IntLiteral,
     PrintStatement,
@@ -32,6 +34,8 @@ class Parser:
             return self._parse_print_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "var":
             return self._parse_var_decl()
+        if token.type == TokenType.IDENTIFIER and token.value == "if":
+            return self._parse_if_statement()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
             return self._parse_assignment()
         raise ParseError(
@@ -71,6 +75,24 @@ class Parser:
 
         return VarDecl(name_token.value, type_token.value, value)
 
+    def _parse_if_statement(self) -> IfStatement:
+        self._expect(TokenType.IDENTIFIER, "if")
+        self._expect(TokenType.LPAREN)
+        condition = self._parse_expression()
+        self._expect(TokenType.RPAREN)
+        self._expect(TokenType.LBRACE)
+        body = []
+        while self._peek().type != TokenType.RBRACE:
+            if self._peek().type == TokenType.EOF:
+                raise ParseError(
+                    "Unterminated if block, expected '}'",
+                    self._peek().line,
+                    self._peek().column,
+                )
+            body.append(self._parse_statement())
+        self._expect(TokenType.RBRACE)
+        return IfStatement(condition, body)
+
     def _parse_assignment(self) -> Assignment:
         name_token = self._expect(TokenType.IDENTIFIER)
         self._expect(TokenType.EQUALS)
@@ -103,6 +125,14 @@ class Parser:
             )
 
     def _parse_expression(self):
+        left = self._parse_primary()
+        if self._peek().type == TokenType.EQUALS_EQUALS:
+            self._advance()
+            right = self._parse_primary()
+            return BinaryOp("==", left, right)
+        return left
+
+    def _parse_primary(self):
         token = self._peek()
         if token.type == TokenType.STRING:
             self._advance()

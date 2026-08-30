@@ -35,6 +35,14 @@ class Lexer:
             self._advance()
             return Token(TokenType.RPAREN, ")", line, column)
 
+        if char == "{":
+            self._advance()
+            return Token(TokenType.LBRACE, "{", line, column)
+
+        if char == "}":
+            self._advance()
+            return Token(TokenType.RBRACE, "}", line, column)
+
         if char == ";":
             self._advance()
             return Token(TokenType.SEMICOLON, ";", line, column)
@@ -45,6 +53,9 @@ class Lexer:
 
         if char == "=":
             self._advance()
+            if self.pos < len(self.source) and self.source[self.pos] == "=":
+                self._advance()
+                return Token(TokenType.EQUALS_EQUALS, "==", line, column)
             return Token(TokenType.EQUALS, "=", line, column)
 
         if char == '"':
