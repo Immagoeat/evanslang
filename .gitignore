@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# compiled evanslang bytecode binaries (output of `evlng --build`)
+*.evlc
