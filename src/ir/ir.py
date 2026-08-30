@@ -5,6 +5,7 @@ class OpCode(Enum):
     PUSH_CONST = auto()
     LOAD = auto()
     STORE = auto()
+    INPUT = auto()
     PRINT = auto()
     HALT = auto()
 

@@ -21,15 +21,35 @@ print(EXAMPLE);
 
 ```
 var <NAME>: <type> = <expression>;
+var <NAME>: <type>;
 ```
 
-Declares a variable named `<NAME>` with the given `<type>` and initializes it
-to `<expression>`. The type annotation is mandatory, and the value's type
-must match it — a mismatch is a compile-time (parse) error.
+Declares a variable named `<NAME>` with the given `<type>`. The type
+annotation is mandatory. If an initial `<expression>` is given, its type
+must match the declared type — a mismatch is a compile-time (parse) error.
+The second form declares the variable without a value; it must be assigned
+before it's read (via `print` or used in another expression).
 
 ```
 var EXAMPLE: str = "Hello";
 var COUNT: int = 9;
+var NAME: str;
+```
+
+### assignment
+
+```
+<NAME> = <expression>;
+```
+
+Assigns `<expression>` to a previously-declared variable `<NAME>`. The
+variable must already exist (declared with `var`), and the value's type must
+match the variable's declared type — both are compile-time (parse) errors
+otherwise.
+
+```
+var bob: str;
+bob = "Hi";
 ```
 
 ## Types
@@ -45,25 +65,44 @@ Currently supported expressions:
 - String literals: `"..."`
 - Integer literals: `9`
 - Identifiers (referencing a previously declared `var`)
+- `input("<prompt>")` — see below
 
-There is no arithmetic, no string concatenation, and no re-assignment of an
-existing variable yet.
+There is no arithmetic and no string concatenation yet.
+
+### input
+
+```
+input("<prompt>")
+```
+
+Prints `<prompt>` (no trailing newline) and reads a line of text from
+stdin, returning it as a `str`. Only usable where a `str` value is expected
+(assigning to or initializing an `int` variable with `input(...)` is a
+parse error).
+
+```
+var bob: str;
+bob = input("MESSAGE");
+print(bob);
+```
 
 ## Grammar (informal)
 
 ```
 program     := statement*
-statement   := printStmt | varDecl
+statement   := printStmt | varDecl | assignment
 printStmt   := "print" "(" expression ")" ";"
-varDecl     := "var" IDENTIFIER ":" type "=" expression ";"
+varDecl     := "var" IDENTIFIER ":" type ("=" expression)? ";"
+assignment  := IDENTIFIER "=" expression ";"
 type        := "int" | "str"
-expression  := STRING | INT | IDENTIFIER
+expression  := STRING | INT | IDENTIFIER | inputCall
+inputCall   := "input" "(" STRING ")"
 ```
 
 ## Not yet implemented
 
 - Arithmetic and boolean operators
-- Re-assignment (`EXAMPLE = "new value";`)
 - Control flow (`if`, `while`, `for`)
 - Functions
 - Comments
+- Parsing `int` values typed via `input(...)` (input is always `str`)

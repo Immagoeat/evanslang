@@ -1,4 +1,12 @@
-from nodes.nodes import Identifier, IntLiteral, PrintStatement, StringLiteral, VarDecl
+from nodes.nodes import (
+    Assignment,
+    Identifier,
+    InputCall,
+    IntLiteral,
+    PrintStatement,
+    StringLiteral,
+    VarDecl,
+)
 from nodes.nodes import Program as AstProgram
 from ir.ir import Instruction, OpCode
 from ir.ir import Program as IrProgram
@@ -19,6 +27,13 @@ class CodeGenerator:
                 Instruction(OpCode.PRINT),
             ]
         if isinstance(node, VarDecl):
+            if node.value is None:
+                return []
+            return [
+                *self._generate_expression(node.value),
+                Instruction(OpCode.STORE, node.name),
+            ]
+        if isinstance(node, Assignment):
             return [
                 *self._generate_expression(node.value),
                 Instruction(OpCode.STORE, node.name),
@@ -32,4 +47,9 @@ class CodeGenerator:
             return [Instruction(OpCode.PUSH_CONST, node.value)]
         if isinstance(node, Identifier):
             return [Instruction(OpCode.LOAD, node.name)]
+        if isinstance(node, InputCall):
+            return [
+                *self._generate_expression(node.prompt),
+                Instruction(OpCode.INPUT),
+            ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")

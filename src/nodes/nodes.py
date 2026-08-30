@@ -27,13 +27,30 @@ class Identifier(Node):
 
 
 class VarDecl(Node):
-    def __init__(self, name: str, type_name: str, value: Node):
+    def __init__(self, name: str, type_name: str, value: Node | None):
         self.name = name
         self.type_name = type_name
         self.value = value
 
     def __repr__(self):
         return f"VarDecl({self.name!r}, {self.type_name!r}, {self.value!r})"
+
+
+class Assignment(Node):
+    def __init__(self, name: str, value: Node):
+        self.name = name
+        self.value = value
+
+    def __repr__(self):
+        return f"Assignment({self.name!r}, {self.value!r})"
+
+
+class InputCall(Node):
+    def __init__(self, prompt: Node):
+        self.prompt = prompt
+
+    def __repr__(self):
+        return f"InputCall({self.prompt!r})"
 
 
 class PrintStatement(Node):

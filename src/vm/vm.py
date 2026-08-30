@@ -20,6 +20,9 @@ class VM:
                         f"Undefined variable {instruction.operand!r}"
                     )
                 self.stack.append(self.variables[instruction.operand])
+            elif instruction.opcode == OpCode.INPUT:
+                prompt = self.stack.pop()
+                self.stack.append(input(prompt))
             elif instruction.opcode == OpCode.PRINT:
                 print(self.stack.pop())
             elif instruction.opcode == OpCode.HALT:

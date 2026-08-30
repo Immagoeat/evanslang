@@ -1,5 +1,7 @@
 from nodes.nodes import (
+    Assignment,
     Identifier,
+    InputCall,
     IntLiteral,
     PrintStatement,
     Program,
@@ -16,6 +18,7 @@ class Parser:
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
         self.pos = 0
+        self.declared_types: dict[str, str] = {}
 
     def parse(self) -> Program:
         statements = []
@@ -29,6 +32,8 @@ class Parser:
             return self._parse_print_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "var":
             return self._parse_var_decl()
+        if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
+            return self._parse_assignment()
         raise ParseError(
             f"Unexpected token {token.value!r}", token.line, token.column
         )
@@ -52,24 +57,50 @@ class Parser:
                 type_token.line,
                 type_token.column,
             )
+
+        self.declared_types[name_token.value] = type_token.value
+
+        if self._peek().type == TokenType.SEMICOLON:
+            self._advance()
+            return VarDecl(name_token.value, type_token.value, None)
+
+        self._expect(TokenType.EQUALS)
+        value = self._parse_expression()
+        self._expect(TokenType.SEMICOLON)
+        self._check_type(name_token, type_token.value, value)
+
+        return VarDecl(name_token.value, type_token.value, value)
+
+    def _parse_assignment(self) -> Assignment:
+        name_token = self._expect(TokenType.IDENTIFIER)
         self._expect(TokenType.EQUALS)
         value = self._parse_expression()
         self._expect(TokenType.SEMICOLON)
 
-        if type_token.value == "str" and not isinstance(value, StringLiteral):
+        declared_type = self.declared_types.get(name_token.value)
+        if declared_type is None:
+            raise ParseError(
+                f"Assignment to undeclared variable {name_token.value!r}",
+                name_token.line,
+                name_token.column,
+            )
+        self._check_type(name_token, declared_type, value)
+
+        return Assignment(name_token.value, value)
+
+    def _check_type(self, name_token: Token, type_name: str, value) -> None:
+        if type_name == "str" and not isinstance(value, (StringLiteral, InputCall)):
             raise ParseError(
                 f"Cannot assign non-string value to 'str' variable {name_token.value!r}",
-                type_token.line,
-                type_token.column,
+                name_token.line,
+                name_token.column,
             )
-        if type_token.value == "int" and not isinstance(value, IntLiteral):
+        if type_name == "int" and not isinstance(value, IntLiteral):
             raise ParseError(
                 f"Cannot assign non-int value to 'int' variable {name_token.value!r}",
-                type_token.line,
-                type_token.column,
+                name_token.line,
+                name_token.column,
             )
-
-        return VarDecl(name_token.value, type_token.value, value)
 
     def _parse_expression(self):
         token = self._peek()
@@ -79,6 +110,8 @@ class Parser:
         if token.type == TokenType.INT:
             self._advance()
             return IntLiteral(int(token.value))
+        if token.type == TokenType.IDENTIFIER and token.value == "input":
+            return self._parse_input_call()
         if token.type == TokenType.IDENTIFIER:
             self._advance()
             return Identifier(token.value)
@@ -88,8 +121,16 @@ class Parser:
             token.column,
         )
 
-    def _peek(self) -> Token:
-        return self.tokens[self.pos]
+    def _parse_input_call(self) -> InputCall:
+        self._expect(TokenType.IDENTIFIER, "input")
+        self._expect(TokenType.LPAREN)
+        prompt_token = self._expect(TokenType.STRING)
+        self._expect(TokenType.RPAREN)
+        return InputCall(StringLiteral(prompt_token.value))
+
+    def _peek(self, offset: int = 0) -> Token:
+        index = min(self.pos + offset, len(self.tokens) - 1)
+        return self.tokens[index]
 
     def _advance(self) -> Token:
         token = self.tokens[self.pos]

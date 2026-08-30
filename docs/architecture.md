@@ -41,8 +41,8 @@ in sync with the VM's behavior but is not currently wired into the CLI.
 | Path | Responsibility |
 |------|-----------------|
 | `src/lexer/` | `Token`/`TokenType`, and `Lexer` which turns source text into a token stream. |
-| `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `StringLiteral`, `IntLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
-| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Also enforces `var` type-matching (declared type vs. literal type) at parse time. |
+| `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `Assignment`, `InputCall`, `StringLiteral`, `IntLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
+| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). |
 | `src/ir/` | `OpCode` enum and `Instruction`/`Program` (bytecode) types. |
 | `src/codegen/` | `CodeGenerator`: AST -> IR. |
 | `src/vm/` | `VM` (stack-based bytecode interpreter with a variable dict) and `bytecode_file` (binary serialization format for `--build`/`--run`). |
@@ -79,5 +79,11 @@ boundary, prints the message to stderr, and exits with status 1.
 | `PUSH_CONST <value>` | Push a literal onto the stack. |
 | `STORE <name>` | Pop the stack, store into variable `name`. |
 | `LOAD <name>` | Push the value of variable `name` (error if undefined). |
+| `INPUT` | Pop a prompt string, call `input(prompt)`, push the result. |
 | `PRINT` | Pop the stack and print it. |
 | `HALT` | Stop execution. |
+
+`var NAME: type;` (no initializer) generates no instructions — the variable
+has no entry in the VM's `variables` dict until an `Assignment` (`STORE`)
+actually runs. Reading it before that point behaves the same as reading any
+other undefined variable (`LOAD` raises `EvansLangError`).
