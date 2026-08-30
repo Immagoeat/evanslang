@@ -75,3 +75,39 @@ def test_tokenizes_compound_assignment_operators():
         TokenType.SEMICOLON,
         TokenType.EOF,
     ]
+
+
+def test_skips_full_line_comment():
+    tokens = Lexer('# a comment\nprint("hi");').tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER,
+        TokenType.LPAREN,
+        TokenType.STRING,
+        TokenType.RPAREN,
+        TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]
+
+
+def test_skips_trailing_comment():
+    tokens = Lexer('print("hi"); # trailing comment').tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER,
+        TokenType.LPAREN,
+        TokenType.STRING,
+        TokenType.RPAREN,
+        TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]
+
+
+def test_comment_only_source_tokenizes_to_eof():
+    tokens = Lexer("# nothing but a comment").tokenize()
+    assert [t.type for t in tokens] == [TokenType.EOF]
+
+
+def test_line_number_correct_after_comment():
+    tokens = Lexer('# comment\nprint("x");').tokenize()
+    assert tokens[0].line == 2

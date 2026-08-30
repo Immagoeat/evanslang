@@ -6,5 +6,5 @@ bob -= 3;
 print(bob);
 bob *= 3;
 print(bob);
-bob /= 3;
+bob /= 29;
 print(bob);

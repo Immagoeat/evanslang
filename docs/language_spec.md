@@ -69,17 +69,14 @@ integer (floor) division; dividing by zero is a runtime error.
 ```
 var bob: int = 10;
 bob += 3;
-print(bob);  // 13
+print(bob);  # 13
 bob -= 3;
-print(bob);  // 10
+print(bob);  # 10
 bob *= 3;
-print(bob);  // 30
+print(bob);  # 30
 bob /= 3;
-print(bob);  // 10
+print(bob);  # 10
 ```
-
-(the `//` comments above are illustrative only — evanslang has no comment
-syntax yet, see "Not yet implemented" below)
 
 ### if / elseif / else
 
@@ -114,6 +111,22 @@ elseif (bob == "Hello") {
 else {
     print("bob says something else");
 }
+```
+
+### comments
+
+```
+# <anything to end of line>
+```
+
+Everything from `#` to the end of the line is ignored. Comments can appear
+on their own line or after code on the same line, and don't need a
+terminating character — the line break (or end of file) ends them.
+
+```
+# This program greets the user.
+var bob: str = "Hi"; # inline comment
+print(bob);
 ```
 
 ## Types
@@ -183,5 +196,5 @@ inputCall      := "input" "(" STRING ")"
 - Boolean operators (`&&`, `||`, `!`)
 - `while` / `for` loops
 - Functions
-- Comments
+- Block comments (`#` only comments to end of line)
 - Parsing `int` values typed via `input(...)` (input is always `str`)

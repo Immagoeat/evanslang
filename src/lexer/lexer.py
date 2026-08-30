@@ -131,7 +131,16 @@ class Lexer:
         return None
 
     def _skip_whitespace(self):
-        while self.pos < len(self.source) and self.source[self.pos].isspace():
+        while self.pos < len(self.source):
+            if self.source[self.pos].isspace():
+                self._advance()
+            elif self.source[self.pos] == "#":
+                self._skip_comment()
+            else:
+                break
+
+    def _skip_comment(self):
+        while self.pos < len(self.source) and self.source[self.pos] != "\n":
             self._advance()
 
     def _advance(self):
