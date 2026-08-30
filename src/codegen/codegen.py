@@ -45,16 +45,53 @@ class CodeGenerator:
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")
 
     def _generate_if(self, node: IfStatement) -> list[Instruction]:
-        condition = self._generate_expression(node.condition)
-        body: list[Instruction] = []
-        for statement in node.body:
-            body.extend(self._generate_statement(statement))
+        branches = [(node.condition, node.body), *node.elif_branches]
 
-        # Offset is relative to the JUMP_IF_FALSE instruction itself: skip
-        # over the body (len(body)) plus the jump instruction (+1) to land
-        # on whatever comes right after the if-block.
-        jump_if_false = Instruction(OpCode.JUMP_IF_FALSE, len(body) + 1)
-        return [*condition, jump_if_false, *body]
+        # Build each conditional branch as [condition..., JUMP_IF_FALSE, body...,
+        # JUMP] where JUMP skips to the very end (past all other branches and
+        # the else body). The trailing JUMP is only needed when there's more
+        # after this branch (another branch or an else); otherwise it's
+        # omitted since falling through already reaches the end.
+        branch_blocks: list[tuple[list[Instruction], list[Instruction]]] = []
+        for condition, body in branches:
+            cond_instrs = self._generate_expression(condition)
+            body_instrs: list[Instruction] = []
+            for statement in body:
+                body_instrs.extend(self._generate_statement(statement))
+            branch_blocks.append((cond_instrs, body_instrs))
+
+        else_instrs: list[Instruction] = []
+        if node.else_body is not None:
+            for statement in node.else_body:
+                else_instrs.extend(self._generate_statement(statement))
+
+        has_trailer = len(branch_blocks) > 1 or node.else_body is not None
+
+        result: list[Instruction] = []
+        for i, (cond_instrs, body_instrs) in enumerate(branch_blocks):
+            is_last_branch = i == len(branch_blocks) - 1
+            needs_jump = has_trailer and not (is_last_branch and node.else_body is None)
+
+            # JUMP_IF_FALSE skips the body (and the trailing JUMP if present).
+            skip = len(body_instrs) + (1 if needs_jump else 0) + 1
+            block = [*cond_instrs, Instruction(OpCode.JUMP_IF_FALSE, skip), *body_instrs]
+            if needs_jump:
+                block.append(Instruction(OpCode.JUMP, None))  # patched below
+            result.append(block)
+
+        # Patch each branch's trailing JUMP to skip past every remaining
+        # branch/else block to the very end of the whole if/elseif/else chain.
+        flat_lengths = [len(block) for block in result]
+        for i, block in enumerate(result):
+            if block and block[-1].opcode == OpCode.JUMP and block[-1].operand is None:
+                remaining = sum(flat_lengths[i + 1 :]) + len(else_instrs)
+                block[-1].operand = remaining + 1
+
+        instructions: list[Instruction] = []
+        for block in result:
+            instructions.extend(block)
+        instructions.extend(else_instrs)
+        return instructions
 
     def _generate_expression(self, node) -> list[Instruction]:
         if isinstance(node, StringLiteral):

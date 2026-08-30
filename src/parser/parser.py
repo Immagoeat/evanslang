@@ -80,18 +80,47 @@ class Parser:
         self._expect(TokenType.LPAREN)
         condition = self._parse_expression()
         self._expect(TokenType.RPAREN)
+        body = self._parse_block()
+        self._skip_optional_semicolon()
+
+        elif_branches: list[tuple] = []
+        while (
+            self._peek().type == TokenType.IDENTIFIER
+            and self._peek().value == "elseif"
+        ):
+            self._advance()
+            self._expect(TokenType.LPAREN)
+            elif_condition = self._parse_expression()
+            self._expect(TokenType.RPAREN)
+            elif_body = self._parse_block()
+            self._skip_optional_semicolon()
+            elif_branches.append((elif_condition, elif_body))
+
+        else_body = None
+        if self._peek().type == TokenType.IDENTIFIER and self._peek().value == "else":
+            self._advance()
+            else_body = self._parse_block()
+            self._skip_optional_semicolon()
+
+        return IfStatement(condition, body, elif_branches, else_body)
+
+    def _parse_block(self) -> list:
         self._expect(TokenType.LBRACE)
-        body = []
+        statements = []
         while self._peek().type != TokenType.RBRACE:
             if self._peek().type == TokenType.EOF:
                 raise ParseError(
-                    "Unterminated if block, expected '}'",
+                    "Unterminated block, expected '}'",
                     self._peek().line,
                     self._peek().column,
                 )
-            body.append(self._parse_statement())
+            statements.append(self._parse_statement())
         self._expect(TokenType.RBRACE)
-        return IfStatement(condition, body)
+        return statements
+
+    def _skip_optional_semicolon(self) -> None:
+        if self._peek().type == TokenType.SEMICOLON:
+            self._advance()
 
     def _parse_assignment(self) -> Assignment:
         name_token = self._expect(TokenType.IDENTIFIER)

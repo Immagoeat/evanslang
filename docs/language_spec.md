@@ -52,22 +52,38 @@ var bob: str;
 bob = "Hi";
 ```
 
-### if
+### if / elseif / else
 
 ```
 if (<expression>) {
     <statement>*
 }
+elseif (<expression>) {
+    <statement>*
+}
+else {
+    <statement>*
+}
 ```
 
-Executes the block if `<expression>` is truthy. The condition is currently
-restricted to an equality comparison (`==`) or a bare value; there is no
-`else`/`else if` yet, and blocks can be empty or nested.
+Executes the first block whose condition is truthy, falling through to
+`else` if none match. `elseif` may repeat any number of times; `elseif` and
+`else` are both optional. The condition is currently restricted to an
+equality comparison (`==`) or a bare value. Blocks can be empty or nested.
+A single optional `;` is allowed immediately after any block's closing
+`}` (including after `if`/`elseif`, not only the last block) — it's purely
+cosmetic and has no effect either way.
 
 ```
 var bob: str = "Hi";
 if (bob == "Hi") {
     print("bob says hi");
+}
+elseif (bob == "Hello") {
+    print("bob says hello");
+}
+else {
+    print("bob says something else");
 }
 ```
 
@@ -117,7 +133,10 @@ statement   := printStmt | varDecl | assignment | ifStmt
 printStmt   := "print" "(" expression ")" ";"
 varDecl     := "var" IDENTIFIER ":" type ("=" expression)? ";"
 assignment  := IDENTIFIER "=" expression ";"
-ifStmt      := "if" "(" expression ")" "{" statement* "}"
+ifStmt      := "if" "(" expression ")" block ";"?
+               ("elseif" "(" expression ")" block ";"?)*
+               ("else" block ";"?)?
+block       := "{" statement* "}"
 type        := "int" | "str"
 expression  := primary ("==" primary)?
 primary     := STRING | INT | IDENTIFIER | inputCall
@@ -127,7 +146,6 @@ inputCall   := "input" "(" STRING ")"
 ## Not yet implemented
 
 - Arithmetic operators
-- `else` / `else if`
 - Comparison operators other than `==` (`!=`, `<`, `>`, ...)
 - Boolean operators (`&&`, `||`, `!`)
 - `while` / `for` loops

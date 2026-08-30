@@ -72,12 +72,23 @@ class BinaryOp(Node):
 
 
 class IfStatement(Node):
-    def __init__(self, condition: Node, body: list[Node]):
+    def __init__(
+        self,
+        condition: Node,
+        body: list[Node],
+        elif_branches: list[tuple[Node, list[Node]]] | None = None,
+        else_body: list[Node] | None = None,
+    ):
         self.condition = condition
         self.body = body
+        self.elif_branches = elif_branches or []
+        self.else_body = else_body
 
     def __repr__(self):
-        return f"IfStatement({self.condition!r}, {self.body!r})"
+        return (
+            f"IfStatement({self.condition!r}, {self.body!r}, "
+            f"elif_branches={self.elif_branches!r}, else_body={self.else_body!r})"
+        )
 
 
 class Program(Node):

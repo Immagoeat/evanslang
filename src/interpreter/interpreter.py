@@ -36,6 +36,15 @@ class Interpreter:
             if self._evaluate(node.condition):
                 for statement in node.body:
                     self._execute(statement)
+                return
+            for elif_condition, elif_body in node.elif_branches:
+                if self._evaluate(elif_condition):
+                    for statement in elif_body:
+                        self._execute(statement)
+                    return
+            if node.else_body is not None:
+                for statement in node.else_body:
+                    self._execute(statement)
             return
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 

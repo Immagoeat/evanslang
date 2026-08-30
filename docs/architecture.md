@@ -42,7 +42,7 @@ in sync with the VM's behavior but is not currently wired into the CLI.
 |------|-----------------|
 | `src/lexer/` | `Token`/`TokenType`, and `Lexer` which turns source text into a token stream. |
 | `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `Assignment`, `InputCall`, `BinaryOp`, `IfStatement`, `StringLiteral`, `IntLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
-| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). `_parse_expression` handles an optional trailing `== primary` on top of `_parse_primary`; equality operands are not type-checked. |
+| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). `_parse_expression` handles an optional trailing `== primary` on top of `_parse_primary`; equality operands are not type-checked. `_parse_if_statement` parses the `if` branch, then loops on `elseif` and finally an optional `else`, sharing `_parse_block` (`{ statement* }`) across all three; `_skip_optional_semicolon` tolerates (but doesn't require) a `;` after any block. |
 | `src/ir/` | `OpCode` enum and `Instruction`/`Program` (bytecode) types. |
 | `src/codegen/` | `CodeGenerator`: AST -> IR. |
 | `src/vm/` | `VM` (stack-based bytecode interpreter with a variable dict) and `bytecode_file` (binary serialization format for `--build`/`--run`). |
@@ -83,7 +83,7 @@ boundary, prints the message to stderr, and exits with status 1.
 | `PRINT` | Pop the stack and print it. |
 | `EQ` | Pop two values, push `left == right`. |
 | `JUMP_IF_FALSE <offset>` | Pop a value; if falsy, add `offset` to the program counter (`offset` is relative to this instruction's own index, so `+1` means "the next instruction"). |
-| `JUMP <offset>` | Unconditionally add `offset` to the program counter. Not currently emitted by codegen (reserved for `else`/loops). |
+| `JUMP <offset>` | Unconditionally add `offset` to the program counter. Emitted at the end of each `if`/`elseif` branch body to skip past the remaining branches and any `else` once a branch has run. |
 | `HALT` | Stop execution. |
 
 `var NAME: type;` (no initializer) generates no instructions — the variable
@@ -91,12 +91,25 @@ has no entry in the VM's `variables` dict until an `Assignment` (`STORE`)
 actually runs. Reading it before that point behaves the same as reading any
 other undefined variable (`LOAD` raises `EvansLangError`).
 
-### if-statement codegen
+### if/elseif/else codegen
 
-`CodeGenerator._generate_if` lays out `[condition..., JUMP_IF_FALSE, body...]`
-with the jump's offset set to `len(body) + 1`, so a false condition skips
-straight past the body to whatever follows. Because the offset is computed
-relative to the jump instruction itself (not the start of the if), nested
-`if` blocks compose correctly without any global position bookkeeping in
-codegen. The VM's `run()` loop uses an explicit program counter (`pc`) rather
-than iterating instructions directly, specifically to support these jumps.
+`CodeGenerator._generate_if` treats the `if` condition plus every `elseif`
+as a uniform list of `(condition, body)` branches, and lays each one out as:
+
+```
+condition...
+JUMP_IF_FALSE <skip past body + JUMP>
+body...
+JUMP <skip to end of the whole chain>       (omitted on the last branch when there's no else)
+```
+
+followed by the `else` body (if any) with no guard, since reaching it means
+every branch above evaluated false. All jump offsets are computed relative
+to the jump instruction's own index — `JUMP_IF_FALSE`'s target is computed
+first (it only needs to know its own branch's length), and each branch's
+trailing `JUMP` is emitted with a placeholder `operand=None` and patched in
+a second pass, once the length of every later branch and the `else` body is
+known. Because offsets are always relative rather than absolute, nested
+`if` blocks compose correctly without any global position bookkeeping. The
+VM's `run()` loop uses an explicit program counter (`pc`) rather than
+iterating instructions directly, specifically to support these jumps.

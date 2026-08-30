@@ -111,3 +111,49 @@ def test_rejects_unterminated_if_block():
     tokens = Lexer('var x: int = 1;\nif (x == 1) {\nprint(x);\n').tokenize()
     with pytest.raises(ParseError):
         Parser(tokens).parse()
+
+
+def test_parses_if_elseif_else_chain():
+    source = (
+        'var bob: str = "Hello";\n'
+        'if (bob == "Hi") {}\n'
+        'elseif (bob == "Hello") {\n'
+        "print(bob);\n"
+        "}\n"
+        "else {}\n"
+    )
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    if_stmt = program.statements[1]
+    assert isinstance(if_stmt, IfStatement)
+    assert len(if_stmt.elif_branches) == 1
+    elif_condition, elif_body = if_stmt.elif_branches[0]
+    assert isinstance(elif_condition, BinaryOp)
+    assert len(elif_body) == 1
+    assert if_stmt.else_body == []
+
+
+def test_parses_if_with_trailing_semicolons():
+    source = (
+        'var bob: str = "Hi";\n'
+        'if (bob == "Hi") {};\n'
+        'elseif (bob == "Hello") {};\n'
+        "else {};\n"
+    )
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    if_stmt = program.statements[1]
+    assert isinstance(if_stmt, IfStatement)
+    assert len(if_stmt.elif_branches) == 1
+    assert if_stmt.else_body == []
+
+
+def test_parses_if_without_elseif_or_else():
+    tokens = Lexer('var bob: str = "Hi";\nif (bob == "Hi") {}\n').tokenize()
+    program = Parser(tokens).parse()
+
+    if_stmt = program.statements[1]
+    assert if_stmt.elif_branches == []
+    assert if_stmt.else_body is None
