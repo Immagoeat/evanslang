@@ -18,6 +18,22 @@ class IntLiteral(Node):
         return f"IntLiteral({self.value!r})"
 
 
+class FloatLiteral(Node):
+    def __init__(self, value: float):
+        self.value = value
+
+    def __repr__(self):
+        return f"FloatLiteral({self.value!r})"
+
+
+class BoolLiteral(Node):
+    def __init__(self, value: bool):
+        self.value = value
+
+    def __repr__(self):
+        return f"BoolLiteral({self.value!r})"
+
+
 class Identifier(Node):
     def __init__(self, name: str):
         self.name = name

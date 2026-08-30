@@ -3,6 +3,12 @@ from ir.ir import Program as IrProgram
 from utils.errors import EvansLangError
 
 
+def _display(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return value
+
+
 class VM:
     def __init__(self):
         self.stack = []
@@ -27,7 +33,7 @@ class VM:
                 prompt = self.stack.pop()
                 self.stack.append(input(prompt))
             elif instruction.opcode == OpCode.PRINT:
-                print(self.stack.pop())
+                print(_display(self.stack.pop()))
             elif instruction.opcode == OpCode.EQ:
                 right = self.stack.pop()
                 left = self.stack.pop()
@@ -80,7 +86,10 @@ class VM:
                 left = self.stack.pop()
                 if right == 0:
                     raise EvansLangError("Division by zero")
-                self.stack.append(left // right)
+                if isinstance(left, int) and isinstance(right, int):
+                    self.stack.append(left // right)
+                else:
+                    self.stack.append(left / right)
             elif instruction.opcode == OpCode.JUMP_IF_FALSE:
                 condition = self.stack.pop()
                 if not condition:

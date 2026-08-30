@@ -116,7 +116,7 @@ class Lexer:
             return self._read_identifier()
 
         if char.isdigit():
-            return self._read_int()
+            return self._read_number()
 
         raise LexError(f"Unexpected character {char!r}", line, column)
 
@@ -147,12 +147,23 @@ class Lexer:
             self._advance()
         return Token(TokenType.IDENTIFIER, "".join(value), line, column)
 
-    def _read_int(self) -> Token:
+    def _read_number(self) -> Token:
         line, column = self.line, self.column
         value = []
         while self.pos < len(self.source) and self.source[self.pos].isdigit():
             value.append(self.source[self.pos])
             self._advance()
+
+        if self.source[self.pos : self.pos + 1] == "." and (
+            self._peek_char(1) is not None and self._peek_char(1).isdigit()
+        ):
+            value.append(self.source[self.pos])
+            self._advance()
+            while self.pos < len(self.source) and self.source[self.pos].isdigit():
+                value.append(self.source[self.pos])
+                self._advance()
+            return Token(TokenType.FLOAT, "".join(value), line, column)
+
         return Token(TokenType.INT, "".join(value), line, column)
 
     def _peek_char(self, offset: int) -> str | None:

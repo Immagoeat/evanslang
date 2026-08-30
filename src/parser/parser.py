@@ -1,6 +1,8 @@
 from nodes.nodes import (
     Assignment,
     BinaryOp,
+    BoolLiteral,
+    FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
@@ -14,7 +16,7 @@ from nodes.nodes import (
 from lexer.token import Token, TokenType
 from utils.errors import ParseError
 
-VALID_TYPES = {"int", "str"}
+VALID_TYPES = {"int", "str", "float", "bool"}
 
 COMPOUND_OPERATORS = {
     TokenType.PLUS_EQUALS: "+",
@@ -172,25 +174,27 @@ class Parser:
                 name_token.line,
                 name_token.column,
             )
-        if declared_type != "int":
+        if declared_type not in ("int", "float"):
             raise ParseError(
-                f"Cannot use {op_token.value!r} on non-int variable {name_token.value!r}",
+                f"Cannot use {op_token.value!r} on non-numeric variable {name_token.value!r}",
                 name_token.line,
                 name_token.column,
             )
-        if isinstance(rhs, IntLiteral):
+
+        literal_types = {"int": IntLiteral, "float": FloatLiteral}
+        if isinstance(rhs, literal_types[declared_type]):
             pass
         elif isinstance(rhs, Identifier):
             rhs_type = self.declared_types.get(rhs.name)
-            if rhs_type != "int":
+            if rhs_type != declared_type:
                 raise ParseError(
-                    f"Cannot use {op_token.value!r} with non-int variable {rhs.name!r}",
+                    f"Cannot use {op_token.value!r} with {rhs_type or 'undeclared'} variable {rhs.name!r} on {declared_type!r} variable {name_token.value!r}",
                     name_token.line,
                     name_token.column,
                 )
         else:
             raise ParseError(
-                f"Cannot use {op_token.value!r} with a non-int value",
+                f"Cannot use {op_token.value!r} with a non-{declared_type} value",
                 name_token.line,
                 name_token.column,
             )
@@ -208,6 +212,18 @@ class Parser:
         if type_name == "int" and not isinstance(value, IntLiteral):
             raise ParseError(
                 f"Cannot assign non-int value to 'int' variable {name_token.value!r}",
+                name_token.line,
+                name_token.column,
+            )
+        if type_name == "float" and not isinstance(value, FloatLiteral):
+            raise ParseError(
+                f"Cannot assign non-float value to 'float' variable {name_token.value!r}",
+                name_token.line,
+                name_token.column,
+            )
+        if type_name == "bool" and not isinstance(value, BoolLiteral):
+            raise ParseError(
+                f"Cannot assign non-bool value to 'bool' variable {name_token.value!r}",
                 name_token.line,
                 name_token.column,
             )
@@ -255,8 +271,17 @@ class Parser:
         if token.type == TokenType.INT:
             self._advance()
             return IntLiteral(int(token.value))
+        if token.type == TokenType.FLOAT:
+            self._advance()
+            return FloatLiteral(float(token.value))
         if token.type == TokenType.IDENTIFIER and token.value == "input":
             return self._parse_input_call()
+        if token.type == TokenType.IDENTIFIER and token.value == "true":
+            self._advance()
+            return BoolLiteral(True)
+        if token.type == TokenType.IDENTIFIER and token.value == "false":
+            self._advance()
+            return BoolLiteral(False)
         if token.type == TokenType.IDENTIFIER:
             self._advance()
             return Identifier(token.value)

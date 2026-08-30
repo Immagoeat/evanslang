@@ -62,9 +62,11 @@ bob = "Hi";
 ```
 
 Shorthand for `<NAME> = <NAME> <op> <expression>;`. Only valid on `int`
-variables; `<expression>` must be an integer literal or another `int`
-variable (both are compile-time (parse) errors otherwise). Division uses
-integer (floor) division; dividing by zero is a runtime error.
+and `float` variables; `<expression>` must be a literal or variable of that
+*same* type — `int` and `float` never mix, even between two variables
+(both are compile-time (parse) errors otherwise). `/=` on `int` uses
+integer (floor) division; on `float` it uses real division. Dividing by
+zero is a runtime error either way.
 
 ```
 var bob: int = 10;
@@ -131,16 +133,24 @@ print(bob);
 
 ## Types
 
-| Type  | Description               | Literal example |
-|-------|----------------------------|------------------|
-| `str` | Text, double-quoted        | `"Hello"`        |
-| `int` | Whole numbers (no sign yet)| `9`               |
+| Type    | Description                            | Literal example |
+|---------|------------------------------------------|------------------|
+| `str`   | Text, double-quoted                     | `"Hello"`        |
+| `int`   | Whole numbers (no sign yet)             | `9`              |
+| `float` | Decimal numbers (requires a digit on both sides of the `.`) | `3.14` |
+| `bool`  | `true` or `false`                       | `true`           |
+
+`int` and `float` are always distinct — an `int` variable can never hold a
+`float` value or vice versa, in `var`, plain assignment, or compound
+assignment. There's no automatic widening (e.g. `int` → `float`).
 
 ## Expressions
 
 Currently supported expressions:
 - String literals: `"..."`
 - Integer literals: `9`
+- Float literals: `3.14` (a digit is required on both sides of the `.`)
+- Boolean literals: `true`, `false`
 - Identifiers (referencing a previously declared `var`)
 - `input("<prompt>")` — see below
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
@@ -161,6 +171,9 @@ an `int` to a `str`) raises a runtime error, matching Python's own
 comparison semantics. `&&` and `||` do **not** short-circuit — both sides
 are always evaluated, even if the left side alone determines the result
 (this matters if a side has a visible effect, like `input(...)`).
+
+`print(<bool>)` outputs `true`/`false` (lowercase, matching the literal
+syntax), not Python-style `True`/`False`.
 
 There is no string concatenation yet.
 
@@ -189,18 +202,18 @@ statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
 assignment     := IDENTIFIER "=" expression ";"
-compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") (INT | IDENTIFIER) ";"
+compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") (INT | FLOAT | IDENTIFIER) ";"
 ifStmt         := "if" "(" expression ")" block ";"?
                   ("elseif" "(" expression ")" block ";"?)*
                   ("else" block ";"?)?
 block          := "{" statement* "}"
-type           := "int" | "str"
+type           := "int" | "str" | "float" | "bool"
 expression     := or
 or             := and ("||" and)*
 and            := not ("&&" not)*
 not            := "!" not | comparison
 comparison     := primary (("==" | "!=" | "<" | "<=" | ">" | ">=") primary)?
-primary        := STRING | INT | IDENTIFIER | inputCall
+primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER | inputCall
 inputCall      := "input" "(" STRING ")"
 ```
 

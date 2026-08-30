@@ -8,6 +8,8 @@ import pytest
 from nodes.nodes import (
     Assignment,
     BinaryOp,
+    BoolLiteral,
+    FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
@@ -249,3 +251,64 @@ def test_parses_not_on_identifier():
     assert isinstance(expr, UnaryOp)
     assert isinstance(expr.operand, Identifier)
     assert expr.operand.name == "flag"
+
+
+def test_parses_float_var_decl():
+    tokens = Lexer("var pi: float = 3.14;").tokenize()
+    program = Parser(tokens).parse()
+
+    statement = program.statements[0]
+    assert isinstance(statement, VarDecl)
+    assert statement.type_name == "float"
+    assert isinstance(statement.value, FloatLiteral)
+    assert statement.value.value == 3.14
+
+
+def test_parses_bool_var_decl_true_and_false():
+    tokens = Lexer("var flag: bool = true;\nvar other: bool = false;").tokenize()
+    program = Parser(tokens).parse()
+
+    flag_decl, other_decl = program.statements
+    assert isinstance(flag_decl.value, BoolLiteral) and flag_decl.value.value is True
+    assert isinstance(other_decl.value, BoolLiteral) and other_decl.value.value is False
+
+
+def test_rejects_int_literal_for_float_variable():
+    tokens = Lexer("var f: float = 5;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_float_literal_for_int_variable():
+    tokens = Lexer("var n: int = 5.0;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_non_bool_for_bool_variable():
+    tokens = Lexer('var b: bool = "x";').tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_parses_compound_assignment_on_float_variable():
+    tokens = Lexer("var f: float = 1.0;\nf += 2.5;").tokenize()
+    program = Parser(tokens).parse()
+
+    assign = program.statements[1]
+    assert isinstance(assign, Assignment)
+    assert isinstance(assign.value, BinaryOp) and assign.value.operator == "+"
+    assert isinstance(assign.value.right, FloatLiteral)
+    assert assign.value.right.value == 2.5
+
+
+def test_rejects_int_literal_in_float_compound_assignment():
+    tokens = Lexer("var f: float = 1.0;\nf += 2;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_mixing_int_and_float_variables_in_compound_assignment():
+    tokens = Lexer("var f: float = 1.0;\nvar n: int = 2;\nf += n;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()

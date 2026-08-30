@@ -40,9 +40,9 @@ in sync with the VM's behavior but is not currently wired into the CLI.
 
 | Path | Responsibility |
 |------|-----------------|
-| `src/lexer/` | `Token`/`TokenType`, and `Lexer` which turns source text into a token stream. `_skip_whitespace` also skips `#`-to-end-of-line comments (via `_skip_comment`), looping so whitespace and comments can alternate; comments never produce a token, so the parser never sees them. |
-| `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `Assignment`, `InputCall`, `BinaryOp`, `UnaryOp`, `IfStatement`, `StringLiteral`, `IntLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
-| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). Expression parsing is a standard precedence chain: `_parse_expression` (`\|\|`) → `_parse_and` (`&&`) → `_parse_unary_not` (prefix `!`, recursive so `!!a` works) → `_parse_comparison` (`==`, `!=`, `<`, `<=`, `>`, `>=`, all non-associative — one comparison per expression, no chaining like `a < b < c`) → `_parse_primary`. None of the comparison/boolean operators are type-checked at parse time; `<`/`<=`/`>`/`>=` are checked at runtime instead (see Error handling). `_parse_if_statement` parses the `if` branch, then loops on `elseif` and finally an optional `else`, sharing `_parse_block` (`{ statement* }`) across all three; `_skip_optional_semicolon` tolerates (but doesn't require) a `;` after any block. `_parse_compound_assignment` desugars `NAME += expr;` (and `-=`/`*=`/`/=`) into a plain `Assignment(NAME, BinaryOp(op, Identifier(NAME), expr))` at parse time — the VM/interpreter never see a distinct "compound assignment" concept, only the `Assignment` + `BinaryOp`/`UnaryOp` they already handle. |
+| `src/lexer/` | `Token`/`TokenType`, and `Lexer` which turns source text into a token stream. `_skip_whitespace` also skips `#`-to-end-of-line comments (via `_skip_comment`), looping so whitespace and comments can alternate; comments never produce a token, so the parser never sees them. `_read_number` (formerly `_read_int`) reads digits, then — only if a `.` is immediately followed by another digit — continues reading a `FLOAT` token; a bare trailing `.` with no digit after it is left alone (not consumed), since `.` isn't valid syntax anywhere else. `true`/`false` are not their own token type — they lex as plain `IDENTIFIER`, the same as `input`, `var`, `if`, etc., and are special-cased in `Parser._parse_primary`. |
+| `src/nodes/` | AST node classes (`Program`, `PrintStatement`, `VarDecl`, `Assignment`, `InputCall`, `BinaryOp`, `UnaryOp`, `IfStatement`, `StringLiteral`, `IntLiteral`, `FloatLiteral`, `BoolLiteral`, `Identifier`). Named `nodes` rather than `ast` to avoid shadowing Python's stdlib `ast` module. |
+| `src/parser/` | Recursive-descent `Parser` that turns tokens into an AST. Tracks each variable's declared type in `Parser.declared_types` as it parses `var` statements, and uses that table to type-check both initializers and later `Assignment`s at parse time (a mismatch, or an assignment to an undeclared name, is a `ParseError`). Expression parsing is a standard precedence chain: `_parse_expression` (`\|\|`) → `_parse_and` (`&&`) → `_parse_unary_not` (prefix `!`, recursive so `!!a` works) → `_parse_comparison` (`==`, `!=`, `<`, `<=`, `>`, `>=`, all non-associative — one comparison per expression, no chaining like `a < b < c`) → `_parse_primary`. None of the comparison/boolean operators are type-checked at parse time; `<`/`<=`/`>`/`>=` are checked at runtime instead (see Error handling). `_parse_if_statement` parses the `if` branch, then loops on `elseif` and finally an optional `else`, sharing `_parse_block` (`{ statement* }`) across all three; `_skip_optional_semicolon` tolerates (but doesn't require) a `;` after any block. `_parse_compound_assignment` desugars `NAME += expr;` (and `-=`/`*=`/`/=`) into a plain `Assignment(NAME, BinaryOp(op, Identifier(NAME), expr))` at parse time — the VM/interpreter never see a distinct "compound assignment" concept, only the `Assignment` + `BinaryOp`/`UnaryOp` they already handle. `int` and `float` are enforced as strictly non-interchangeable everywhere a type is checked (`_check_type`, `_parse_compound_assignment`'s `literal_types` map keyed by declared type) — no widening either direction. |
 | `src/ir/` | `OpCode` enum and `Instruction`/`Program` (bytecode) types. |
 | `src/codegen/` | `CodeGenerator`: AST -> IR. |
 | `src/vm/` | `VM` (stack-based bytecode interpreter with a variable dict) and `bytecode_file` (binary serialization format for `--build`/`--run`). |
@@ -96,7 +96,7 @@ and CI stay plain-text.
 | `LT` / `LTE` / `GT` / `GTE` | Pop two values, push `left <op> right` using Python's native ordering comparison. Raises `EvansLangError` if the operand types aren't comparable (e.g. `int` vs `str`), via `VM._compare()`. |
 | `AND` / `OR` | Pop two values, push `bool(left) and bool(right)` / `bool(left) or bool(right)`. Both operands are always evaluated by codegen before the opcode runs — no short-circuiting. |
 | `NOT` | Pop one value, push `not value`. |
-| `ADD` / `SUB` / `MUL` / `DIV` | Pop `right` then `left`, push `left <op> right`. `DIV` uses integer (floor) division and raises `EvansLangError` on division by zero. |
+| `ADD` / `SUB` / `MUL` / `DIV` | Pop `right` then `left`, push `left <op> right`. `DIV` checks the runtime Python types of both operands: floor division (`//`) if both are `int`, real division (`/`) otherwise (i.e. either operand is a `float`); raises `EvansLangError` on division by zero either way. |
 | `JUMP_IF_FALSE <offset>` | Pop a value; if falsy, add `offset` to the program counter (`offset` is relative to this instruction's own index, so `+1` means "the next instruction"). |
 | `JUMP <offset>` | Unconditionally add `offset` to the program counter. Emitted at the end of each `if`/`elseif` branch body to skip past the remaining branches and any `else` once a branch has run. |
 | `HALT` | Stop execution. |
@@ -105,6 +105,20 @@ and CI stay plain-text.
 has no entry in the VM's `variables` dict until an `Assignment` (`STORE`)
 actually runs. Reading it before that point behaves the same as reading any
 other undefined variable (`LOAD` raises `EvansLangError`).
+
+### bool representation
+
+There's no distinct evanslang runtime value for `bool` — the VM and
+interpreter both use Python's native `bool`, which is a subclass of `int`
+(`isinstance(True, int)` is `True`). This is invisible in practice because
+`bool` values only ever originate from `BoolLiteral`/comparison/boolean
+opcodes and are never produced by arithmetic, so the `int`/`bool` overlap
+doesn't leak into user-visible behavior. The one place it's handled
+explicitly is display: `VM`'s and `Interpreter`'s private `_display()`
+helpers check `isinstance(value, bool)` *before* any `int` handling and
+render `"true"`/`"false"` instead of Python's `print()` default of
+`True`/`False`. `PRINT` (and `print()` in `Interpreter._execute`) always
+routes through `_display()`.
 
 ### if/elseif/else codegen
 

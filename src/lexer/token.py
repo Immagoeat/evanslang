@@ -5,6 +5,7 @@ class TokenType(Enum):
     IDENTIFIER = auto()
     STRING = auto()
     INT = auto()
+    FLOAT = auto()
     LPAREN = auto()
     RPAREN = auto()
     LBRACE = auto()

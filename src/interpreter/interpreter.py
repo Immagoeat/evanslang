@@ -1,6 +1,8 @@
 from nodes.nodes import (
     Assignment,
     BinaryOp,
+    BoolLiteral,
+    FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
@@ -14,6 +16,12 @@ from nodes.nodes import (
 from utils.errors import EvansLangError
 
 
+def _display(value):
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return value
+
+
 class Interpreter:
     def __init__(self):
         self.variables = {}
@@ -24,7 +32,7 @@ class Interpreter:
 
     def _execute(self, node):
         if isinstance(node, PrintStatement):
-            print(self._evaluate(node.argument))
+            print(_display(self._evaluate(node.argument)))
             return
         if isinstance(node, VarDecl):
             if node.value is not None:
@@ -53,6 +61,10 @@ class Interpreter:
         if isinstance(node, StringLiteral):
             return node.value
         if isinstance(node, IntLiteral):
+            return node.value
+        if isinstance(node, FloatLiteral):
+            return node.value
+        if isinstance(node, BoolLiteral):
             return node.value
         if isinstance(node, Identifier):
             if node.name not in self.variables:
@@ -93,7 +105,9 @@ class Interpreter:
             if node.operator == "/":
                 if right == 0:
                     raise EvansLangError("Division by zero")
-                return left // right
+                if isinstance(left, int) and isinstance(right, int):
+                    return left // right
+                return left / right
             raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
         if isinstance(node, UnaryOp):
             if node.operator == "!":

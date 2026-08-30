@@ -1,6 +1,8 @@
 from nodes.nodes import (
     Assignment,
     BinaryOp,
+    BoolLiteral,
+    FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
@@ -117,6 +119,10 @@ class CodeGenerator:
         if isinstance(node, StringLiteral):
             return [Instruction(OpCode.PUSH_CONST, node.value)]
         if isinstance(node, IntLiteral):
+            return [Instruction(OpCode.PUSH_CONST, node.value)]
+        if isinstance(node, FloatLiteral):
+            return [Instruction(OpCode.PUSH_CONST, node.value)]
+        if isinstance(node, BoolLiteral):
             return [Instruction(OpCode.PUSH_CONST, node.value)]
         if isinstance(node, Identifier):
             return [Instruction(OpCode.LOAD, node.name)]
