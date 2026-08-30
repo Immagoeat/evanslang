@@ -48,7 +48,7 @@ in sync with the VM's behavior but is not currently wired into the CLI.
 | `src/vm/` | `VM` (stack-based bytecode interpreter with a variable dict) and `bytecode_file` (binary serialization format for `--build`/`--run`). |
 | `src/interpreter/` | `Interpreter`: direct AST tree-walker, alternative to the VM path. |
 | `src/semantic/` | Reserved for a dedicated semantic-analysis pass (symbol table, type checking) as the language grows past parser-level checks. Currently empty. |
-| `src/utils/errors.py` | `EvansLangError` and subclasses (`LexError`, `ParseError`) used for user-facing diagnostics. |
+| `src/utils/errors.py` | `EvansLangError` and subclasses (`LexError`, `ParseError`) used for user-facing diagnostics. Each carries structured `message`/`line`/`column`/`kind` fields (rather than a single pre-formatted string) so `main.py` can render them. |
 
 ## Bytecode file format
 
@@ -69,8 +69,19 @@ above); `.gitignore` excludes `*.evlc` so build output isn't committed.
 ## Error handling
 
 All user-facing errors (bad syntax, type mismatches, undefined variables)
-raise a subclass of `EvansLangError`. `main.py` catches these at the CLI
-boundary, prints the message to stderr, and exits with status 1.
+raise a subclass of `EvansLangError`, carrying `kind` (`"lex error"`,
+`"parse error"`, or the base `"error"` for runtime errors with no source
+location), `message`, and optional `line`/`column`. `main.py` catches these
+at the CLI boundary and renders them with `print_error()`: a bold-red
+`<kind>: <message>` header, plus a dim `at <file>:<line>:<column>` line
+when a location is available (omitted for runtime errors, which have none),
+then exits with status 1. Non-`EvansLangError` failures (`OSError`,
+`ValueError` — e.g. a missing source file) are wrapped in a bare
+`EvansLangError` so they go through the same renderer.
+
+Color is enabled only when stderr is a TTY (`sys.stderr.isatty()`) and the
+`NO_COLOR` environment variable is unset, so piped output, redirected logs,
+and CI stay plain-text.
 
 ## Current opcodes
 

@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -10,6 +11,36 @@ from parser.parser import Parser
 from utils.errors import EvansLangError
 from vm import bytecode_file
 from vm.vm import VM
+
+BOLD_RED = "\033[1;31m"
+BOLD = "\033[1m"
+DIM = "\033[2m"
+RESET = "\033[0m"
+
+
+def _use_color() -> bool:
+    if os.environ.get("NO_COLOR") is not None:
+        return False
+    return sys.stderr.isatty()
+
+
+def print_error(error: EvansLangError, source_path: Path | None = None) -> None:
+    color = _use_color()
+    kind = getattr(error, "kind", "error")
+
+    if color:
+        header = f"{BOLD_RED}{kind}:{RESET} {BOLD}{error.message}{RESET}"
+    else:
+        header = f"{kind}: {error.message}"
+    print(header, file=sys.stderr)
+
+    if error.line is not None:
+        location = f"{source_path}:" if source_path else "line "
+        location += f"{error.line}:{error.column}"
+        if color:
+            print(f"{DIM}  at {location}{RESET}", file=sys.stderr)
+        else:
+            print(f"  at {location}", file=sys.stderr)
 
 
 BYTECODE_EXTENSION = ".evlc"
@@ -60,18 +91,20 @@ def main():
     )
     args = parser.parse_args()
 
+    source_path = Path(args.build[0]) if args.build else None
+
     try:
         if args.build:
-            source_path, output_path = args.build
-            written_path = build(Path(source_path), Path(output_path))
+            _, output_path = args.build
+            written_path = build(source_path, Path(output_path))
             print(f"Built {written_path}")
         elif args.run:
             run(Path(args.run))
     except EvansLangError as e:
-        print(e, file=sys.stderr)
+        print_error(e, source_path)
         sys.exit(1)
     except (OSError, ValueError) as e:
-        print(f"error: {e}", file=sys.stderr)
+        print_error(EvansLangError(str(e)))
         sys.exit(1)
 
 
