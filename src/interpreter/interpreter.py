@@ -2,11 +2,13 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    ExpressionStatement,
     FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
     IntLiteral,
+    ParseCall,
     PrintStatement,
     Program,
     StringLiteral,
@@ -20,6 +22,17 @@ def _display(value):
     if isinstance(value, bool):
         return "true" if value else "false"
     return value
+
+
+def _parse_number(text: str):
+    try:
+        return int(text)
+    except ValueError:
+        pass
+    try:
+        return float(text)
+    except ValueError:
+        raise EvansLangError(f"Cannot parse {text!r} as a number")
 
 
 class Interpreter:
@@ -55,6 +68,9 @@ class Interpreter:
                 for statement in node.else_body:
                     self._execute(statement)
             return
+        if isinstance(node, ExpressionStatement):
+            self._evaluate(node.expression)
+            return
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 
     def _evaluate(self, node):
@@ -72,6 +88,8 @@ class Interpreter:
             return self.variables[node.name]
         if isinstance(node, InputCall):
             return input(self._evaluate(node.prompt))
+        if isinstance(node, ParseCall):
+            return _parse_number(self._evaluate(node.target))
         if isinstance(node, BinaryOp):
             left = self._evaluate(node.left)
             right = self._evaluate(node.right)

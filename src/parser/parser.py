@@ -2,11 +2,13 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    ExpressionStatement,
     FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
     IntLiteral,
+    ParseCall,
     PrintStatement,
     Program,
     StringLiteral,
@@ -59,9 +61,16 @@ class Parser:
             return self._parse_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
             return self._parse_compound_assignment()
+        if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.DOT:
+            return self._parse_expression_statement()
         raise ParseError(
             f"Unexpected token {token.value!r}", token.line, token.column
         )
+
+    def _parse_expression_statement(self) -> ExpressionStatement:
+        expression = self._parse_expression()
+        self._expect(TokenType.SEMICOLON)
+        return ExpressionStatement(expression)
 
     def _parse_print_statement(self) -> PrintStatement:
         self._expect(TokenType.IDENTIFIER, "print")
@@ -209,13 +218,21 @@ class Parser:
                 name_token.line,
                 name_token.column,
             )
-        if type_name == "int" and not isinstance(value, IntLiteral):
+        if (
+            type_name == "int"
+            and not isinstance(value, IntLiteral)
+            and not isinstance(value, ParseCall)
+        ):
             raise ParseError(
                 f"Cannot assign non-int value to 'int' variable {name_token.value!r}",
                 name_token.line,
                 name_token.column,
             )
-        if type_name == "float" and not isinstance(value, FloatLiteral):
+        if (
+            type_name == "float"
+            and not isinstance(value, FloatLiteral)
+            and not isinstance(value, ParseCall)
+        ):
             raise ParseError(
                 f"Cannot assign non-float value to 'float' variable {name_token.value!r}",
                 name_token.line,
@@ -284,7 +301,19 @@ class Parser:
             return BoolLiteral(False)
         if token.type == TokenType.IDENTIFIER:
             self._advance()
-            return Identifier(token.value)
+            target = Identifier(token.value)
+            if self._peek().type == TokenType.DOT:
+                self._advance()
+                self._expect(TokenType.IDENTIFIER, "parse")
+                target_type = self.declared_types.get(target.name)
+                if target_type != "str":
+                    raise ParseError(
+                        f"Cannot call .parse on {target_type or 'undeclared'} variable {target.name!r} (expected 'str')",
+                        token.line,
+                        token.column,
+                    )
+                return ParseCall(target)
+            return target
         raise ParseError(
             f"Expected an expression but got {token.value!r}",
             token.line,

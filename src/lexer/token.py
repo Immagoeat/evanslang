@@ -12,6 +12,7 @@ class TokenType(Enum):
     RBRACE = auto()
     SEMICOLON = auto()
     COLON = auto()
+    DOT = auto()
     EQUALS = auto()
     EQUALS_EQUALS = auto()
     NOT_EQUALS = auto()

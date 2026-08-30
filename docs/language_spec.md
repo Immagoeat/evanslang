@@ -194,11 +194,40 @@ bob = input("MESSAGE");
 print(bob);
 ```
 
+### .parse
+
+```
+<NAME>.parse
+```
+
+Converts a `str` variable's current value to a number, auto-detecting
+`int` vs. `float` from the text at runtime (`"42"` → `int`, `"3.14"` →
+`float`). `<NAME>` must be a previously-declared `str` variable — calling
+`.parse` on a non-`str` or undeclared variable is a parse-time error. Since
+the resulting type depends on the string's *contents* (not knowable until
+the program runs), `bob.parse` is accepted as the initializer/assigned
+value for both `int` and `float` variables at parse time; if the runtime
+type doesn't actually match what gets stored, that mismatch isn't caught.
+If the string isn't a valid number at all, `.parse` raises a runtime
+error. `.parse` can be used as an expression (assigned or passed to
+`print`) or as a bare statement (`bob.parse;`), in which case the result
+is simply discarded.
+
+```
+var bob: str = "42";
+var n: int = bob.parse;
+print(n);
+
+var pi_str: str = "3.14";
+var pi: float = pi_str.parse;
+print(pi);
+```
+
 ## Grammar (informal)
 
 ```
 program        := statement*
-statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt
+statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt | exprStmt
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
 assignment     := IDENTIFIER "=" expression ";"
@@ -206,6 +235,7 @@ compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") (INT | FLOAT | IDENTIFI
 ifStmt         := "if" "(" expression ")" block ";"?
                   ("elseif" "(" expression ")" block ";"?)*
                   ("else" block ";"?)?
+exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool"
 expression     := or
@@ -213,7 +243,7 @@ or             := and ("||" and)*
 and            := not ("&&" not)*
 not            := "!" not | comparison
 comparison     := primary (("==" | "!=" | "<" | "<=" | ">" | ">=") primary)?
-primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER | inputCall
+primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER ("." "parse")? | inputCall
 inputCall      := "input" "(" STRING ")"
 ```
 
@@ -225,4 +255,4 @@ inputCall      := "input" "(" STRING ")"
 - `while` / `for` loops
 - Functions
 - Block comments (`#` only comments to end of line)
-- Parsing `int` values typed via `input(...)` (input is always `str`)
+- `.parse`-equivalent for `bool` (a `str` can't currently be converted to `bool`)

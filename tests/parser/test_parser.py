@@ -9,11 +9,13 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    ExpressionStatement,
     FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
     IntLiteral,
+    ParseCall,
     PrintStatement,
     StringLiteral,
     UnaryOp,
@@ -310,5 +312,53 @@ def test_rejects_int_literal_in_float_compound_assignment():
 
 def test_rejects_mixing_int_and_float_variables_in_compound_assignment():
     tokens = Lexer("var f: float = 1.0;\nvar n: int = 2;\nf += n;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_parses_dot_parse_in_var_decl():
+    tokens = Lexer('var bob: str = "42";\nvar n: int = bob.parse;').tokenize()
+    program = Parser(tokens).parse()
+
+    decl = program.statements[1]
+    assert isinstance(decl, VarDecl)
+    assert decl.type_name == "int"
+    assert isinstance(decl.value, ParseCall)
+    assert isinstance(decl.value.target, Identifier)
+    assert decl.value.target.name == "bob"
+
+
+def test_parses_dot_parse_for_float_target():
+    tokens = Lexer('var bob: str = "3.14";\nvar f: float = bob.parse;').tokenize()
+    program = Parser(tokens).parse()
+
+    decl = program.statements[1]
+    assert isinstance(decl.value, ParseCall)
+
+
+def test_parses_bare_dot_parse_as_expression_statement():
+    tokens = Lexer('var bob: str = "42";\nbob.parse;').tokenize()
+    program = Parser(tokens).parse()
+
+    stmt = program.statements[1]
+    assert isinstance(stmt, ExpressionStatement)
+    assert isinstance(stmt.expression, ParseCall)
+    assert stmt.expression.target.name == "bob"
+
+
+def test_rejects_dot_parse_on_non_str_variable():
+    tokens = Lexer("var n: int = 5;\nvar m: int = n.parse;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_dot_parse_on_undeclared_variable():
+    tokens = Lexer("var n: int = x.parse;").tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_dot_parse_assigned_to_bool():
+    tokens = Lexer('var s: str = "true";\nvar b: bool = s.parse;').tokenize()
     with pytest.raises(ParseError):
         Parser(tokens).parse()

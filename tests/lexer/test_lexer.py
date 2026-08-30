@@ -167,3 +167,15 @@ def test_tokenizes_true_false_as_identifiers():
     assert types == [TokenType.IDENTIFIER, TokenType.IDENTIFIER, TokenType.EOF]
     assert tokens[0].value == "true"
     assert tokens[1].value == "false"
+
+
+def test_tokenizes_dot_parse():
+    tokens = Lexer("bob.parse;").tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER,  # bob
+        TokenType.DOT,
+        TokenType.IDENTIFIER,  # parse
+        TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]

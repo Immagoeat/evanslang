@@ -6,6 +6,7 @@ class OpCode(Enum):
     LOAD = auto()
     STORE = auto()
     INPUT = auto()
+    PARSE = auto()
     PRINT = auto()
     EQ = auto()
     NEQ = auto()
@@ -22,6 +23,7 @@ class OpCode(Enum):
     DIV = auto()
     JUMP_IF_FALSE = auto()
     JUMP = auto()
+    POP = auto()
     HALT = auto()
 
 

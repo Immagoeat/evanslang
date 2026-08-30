@@ -2,11 +2,13 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    ExpressionStatement,
     FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
     IntLiteral,
+    ParseCall,
     PrintStatement,
     StringLiteral,
     UnaryOp,
@@ -64,6 +66,11 @@ class CodeGenerator:
             ]
         if isinstance(node, IfStatement):
             return self._generate_if(node)
+        if isinstance(node, ExpressionStatement):
+            return [
+                *self._generate_expression(node.expression),
+                Instruction(OpCode.POP),
+            ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")
 
     def _generate_if(self, node: IfStatement) -> list[Instruction]:
@@ -130,6 +137,11 @@ class CodeGenerator:
             return [
                 *self._generate_expression(node.prompt),
                 Instruction(OpCode.INPUT),
+            ]
+        if isinstance(node, ParseCall):
+            return [
+                *self._generate_expression(node.target),
+                Instruction(OpCode.PARSE),
             ]
         if isinstance(node, BinaryOp):
             opcode = BINARY_OPCODES.get(node.operator)

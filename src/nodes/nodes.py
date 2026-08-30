@@ -69,12 +69,28 @@ class InputCall(Node):
         return f"InputCall({self.prompt!r})"
 
 
+class ParseCall(Node):
+    def __init__(self, target: Node):
+        self.target = target
+
+    def __repr__(self):
+        return f"ParseCall({self.target!r})"
+
+
 class PrintStatement(Node):
     def __init__(self, argument: Node):
         self.argument = argument
 
     def __repr__(self):
         return f"PrintStatement({self.argument!r})"
+
+
+class ExpressionStatement(Node):
+    def __init__(self, expression: Node):
+        self.expression = expression
+
+    def __repr__(self):
+        return f"ExpressionStatement({self.expression!r})"
 
 
 class BinaryOp(Node):

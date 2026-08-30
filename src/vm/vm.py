@@ -9,6 +9,17 @@ def _display(value):
     return value
 
 
+def _parse_number(text: str):
+    try:
+        return int(text)
+    except ValueError:
+        pass
+    try:
+        return float(text)
+    except ValueError:
+        raise EvansLangError(f"Cannot parse {text!r} as a number")
+
+
 class VM:
     def __init__(self):
         self.stack = []
@@ -32,6 +43,10 @@ class VM:
             elif instruction.opcode == OpCode.INPUT:
                 prompt = self.stack.pop()
                 self.stack.append(input(prompt))
+            elif instruction.opcode == OpCode.PARSE:
+                self.stack.append(_parse_number(self.stack.pop()))
+            elif instruction.opcode == OpCode.POP:
+                self.stack.pop()
             elif instruction.opcode == OpCode.PRINT:
                 print(_display(self.stack.pop()))
             elif instruction.opcode == OpCode.EQ:

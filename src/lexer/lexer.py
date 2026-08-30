@@ -51,6 +51,10 @@ class Lexer:
             self._advance()
             return Token(TokenType.COLON, ":", line, column)
 
+        if char == ".":
+            self._advance()
+            return Token(TokenType.DOT, ".", line, column)
+
         if char == "=":
             self._advance()
             if self.pos < len(self.source) and self.source[self.pos] == "=":
