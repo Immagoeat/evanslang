@@ -8,6 +8,7 @@ from nodes.nodes import (
     PrintStatement,
     Program,
     StringLiteral,
+    UnaryOp,
     VarDecl,
 )
 from lexer.token import Token, TokenType
@@ -20,6 +21,15 @@ COMPOUND_OPERATORS = {
     TokenType.MINUS_EQUALS: "-",
     TokenType.STAR_EQUALS: "*",
     TokenType.SLASH_EQUALS: "/",
+}
+
+COMPARISON_OPERATORS = {
+    TokenType.EQUALS_EQUALS: "==",
+    TokenType.NOT_EQUALS: "!=",
+    TokenType.LESS: "<",
+    TokenType.LESS_EQUALS: "<=",
+    TokenType.GREATER: ">",
+    TokenType.GREATER_EQUALS: ">=",
 }
 
 
@@ -203,11 +213,38 @@ class Parser:
             )
 
     def _parse_expression(self):
+        return self._parse_or()
+
+    def _parse_or(self):
+        left = self._parse_and()
+        while self._peek().type == TokenType.OR_OR:
+            self._advance()
+            right = self._parse_and()
+            left = BinaryOp("||", left, right)
+        return left
+
+    def _parse_and(self):
+        left = self._parse_unary_not()
+        while self._peek().type == TokenType.AND_AND:
+            self._advance()
+            right = self._parse_unary_not()
+            left = BinaryOp("&&", left, right)
+        return left
+
+    def _parse_unary_not(self):
+        if self._peek().type == TokenType.BANG:
+            self._advance()
+            operand = self._parse_unary_not()
+            return UnaryOp("!", operand)
+        return self._parse_comparison()
+
+    def _parse_comparison(self):
         left = self._parse_primary()
-        if self._peek().type == TokenType.EQUALS_EQUALS:
+        if self._peek().type in COMPARISON_OPERATORS:
+            operator = COMPARISON_OPERATORS[self._peek().type]
             self._advance()
             right = self._parse_primary()
-            return BinaryOp("==", left, right)
+            return BinaryOp(operator, left, right)
         return left
 
     def _parse_primary(self):

@@ -94,11 +94,11 @@ else {
 
 Executes the first block whose condition is truthy, falling through to
 `else` if none match. `elseif` may repeat any number of times; `elseif` and
-`else` are both optional. The condition is currently restricted to an
-equality comparison (`==`) or a bare value. Blocks can be empty or nested.
-A single optional `;` is allowed immediately after any block's closing
-`}` (including after `if`/`elseif`, not only the last block) — it's purely
-cosmetic and has no effect either way.
+`else` are both optional. The condition can be any expression, including
+comparisons and boolean combinations (see Expressions below). Blocks can be
+empty or nested. A single optional `;` is allowed immediately after any
+block's closing `}` (including after `if`/`elseif`, not only the last
+block) — it's purely cosmetic and has no effect either way.
 
 ```
 var bob: str = "Hi";
@@ -143,15 +143,26 @@ Currently supported expressions:
 - Integer literals: `9`
 - Identifiers (referencing a previously declared `var`)
 - `input("<prompt>")` — see below
-- Equality comparisons: `<expr> == <expr>` (used in `if` conditions)
+- Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- Boolean operators: `&&` (and), `||` (or), `!` (not, prefix/unary)
 - Arithmetic (`+`, `-`, `*`, `/`) — currently only reachable through
   compound assignment (`+=`, `-=`, `*=`, `/=`), not as a general infix
   expression inside `print(...)` or elsewhere
 
-There is no string concatenation and no comparison operators other than
-`==` (`!=`, `<`, `>`, ...) yet. Equality comparison does not type-check its
-operands — comparing an `int` to a `str` is allowed and simply evaluates to
-`false` at runtime rather than being a parse error.
+Precedence, loosest to tightest: `||`, then `&&`, then `!`, then the
+comparison operators, then primaries (literals/identifiers/`input`). There
+is no operator grouping with parentheses yet — `!` applies to the entire
+comparison that follows it (`!a == b` means `!(a == b)`, not `(!a) == b`).
+
+`==`/`!=` never type-check their operands — comparing an `int` to a `str`
+is allowed and simply evaluates to `false`/`true` at runtime. `<`, `<=`,
+`>`, `>=` do check at runtime: comparing values of different types (e.g.
+an `int` to a `str`) raises a runtime error, matching Python's own
+comparison semantics. `&&` and `||` do **not** short-circuit — both sides
+are always evaluated, even if the left side alone determines the result
+(this matters if a side has a visible effect, like `input(...)`).
+
+There is no string concatenation yet.
 
 ### input
 
@@ -184,7 +195,11 @@ ifStmt         := "if" "(" expression ")" block ";"?
                   ("else" block ";"?)?
 block          := "{" statement* "}"
 type           := "int" | "str"
-expression     := primary ("==" primary)?
+expression     := or
+or             := and ("||" and)*
+and            := not ("&&" not)*
+not            := "!" not | comparison
+comparison     := primary (("==" | "!=" | "<" | "<=" | ">" | ">=") primary)?
 primary        := STRING | INT | IDENTIFIER | inputCall
 inputCall      := "input" "(" STRING ")"
 ```
@@ -192,8 +207,8 @@ inputCall      := "input" "(" STRING ")"
 ## Not yet implemented
 
 - Arithmetic as a general infix expression (only reachable via compound assignment right now)
-- Comparison operators other than `==` (`!=`, `<`, `>`, ...)
-- Boolean operators (`&&`, `||`, `!`)
+- Operator grouping with parentheses (e.g. `(a || b) && c`)
+- Short-circuit evaluation of `&&`/`||`
 - `while` / `for` loops
 - Functions
 - Block comments (`#` only comments to end of line)

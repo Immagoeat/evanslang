@@ -111,3 +111,27 @@ def test_comment_only_source_tokenizes_to_eof():
 def test_line_number_correct_after_comment():
     tokens = Lexer('# comment\nprint("x");').tokenize()
     assert tokens[0].line == 2
+
+
+def test_tokenizes_comparison_operators():
+    tokens = Lexer("a != b; a < b; a <= b; a > b; a >= b;").tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER, TokenType.NOT_EQUALS, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.IDENTIFIER, TokenType.LESS, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.IDENTIFIER, TokenType.LESS_EQUALS, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.IDENTIFIER, TokenType.GREATER, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.IDENTIFIER, TokenType.GREATER_EQUALS, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]
+
+
+def test_tokenizes_boolean_operators():
+    tokens = Lexer("a && b; a || b; !a;").tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER, TokenType.AND_AND, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.IDENTIFIER, TokenType.OR_OR, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.BANG, TokenType.IDENTIFIER, TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]

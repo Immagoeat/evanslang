@@ -7,6 +7,7 @@ from nodes.nodes import (
     IntLiteral,
     PrintStatement,
     StringLiteral,
+    UnaryOp,
     VarDecl,
 )
 from nodes.nodes import Program as AstProgram
@@ -15,10 +16,21 @@ from ir.ir import Program as IrProgram
 
 BINARY_OPCODES = {
     "==": OpCode.EQ,
+    "!=": OpCode.NEQ,
+    "<": OpCode.LT,
+    "<=": OpCode.LTE,
+    ">": OpCode.GT,
+    ">=": OpCode.GTE,
+    "&&": OpCode.AND,
+    "||": OpCode.OR,
     "+": OpCode.ADD,
     "-": OpCode.SUB,
     "*": OpCode.MUL,
     "/": OpCode.DIV,
+}
+
+UNARY_OPCODES = {
+    "!": OpCode.NOT,
 }
 
 
@@ -120,6 +132,14 @@ class CodeGenerator:
             return [
                 *self._generate_expression(node.left),
                 *self._generate_expression(node.right),
+                Instruction(opcode),
+            ]
+        if isinstance(node, UnaryOp):
+            opcode = UNARY_OPCODES.get(node.operator)
+            if opcode is None:
+                raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
+            return [
+                *self._generate_expression(node.operand),
                 Instruction(opcode),
             ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")

@@ -8,11 +8,13 @@ import pytest
 from nodes.nodes import (
     Assignment,
     BinaryOp,
+    Identifier,
     IfStatement,
     InputCall,
     IntLiteral,
     PrintStatement,
     StringLiteral,
+    UnaryOp,
     VarDecl,
 )
 from lexer.lexer import Lexer
@@ -209,3 +211,41 @@ def test_rejects_compound_assignment_with_str_rhs():
     tokens = Lexer('var n: int = 1;\nn += "x";').tokenize()
     with pytest.raises(ParseError):
         Parser(tokens).parse()
+
+
+def test_parses_all_comparison_operators():
+    tokens = Lexer("a != b").tokenize()
+    expr = Parser(tokens)._parse_expression()
+    assert isinstance(expr, BinaryOp) and expr.operator == "!="
+
+    for source, op in [("a < b", "<"), ("a <= b", "<="), ("a > b", ">"), ("a >= b", ">=")]:
+        tokens = Lexer(source).tokenize()
+        expr = Parser(tokens)._parse_expression()
+        assert isinstance(expr, BinaryOp) and expr.operator == op
+
+
+def test_parses_and_or_with_correct_precedence():
+    tokens = Lexer("a == b && c == d || e == f").tokenize()
+    expr = Parser(tokens)._parse_expression()
+
+    # || is lowest precedence, so the top node is the ||
+    assert isinstance(expr, BinaryOp) and expr.operator == "||"
+    assert isinstance(expr.left, BinaryOp) and expr.left.operator == "&&"
+    assert isinstance(expr.right, BinaryOp) and expr.right.operator == "=="
+
+
+def test_parses_not_operator():
+    tokens = Lexer("!a == b").tokenize()
+    expr = Parser(tokens)._parse_expression()
+
+    assert isinstance(expr, UnaryOp) and expr.operator == "!"
+    assert isinstance(expr.operand, BinaryOp) and expr.operand.operator == "=="
+
+
+def test_parses_not_on_identifier():
+    tokens = Lexer("!flag").tokenize()
+    expr = Parser(tokens)._parse_expression()
+
+    assert isinstance(expr, UnaryOp)
+    assert isinstance(expr.operand, Identifier)
+    assert expr.operand.name == "flag"

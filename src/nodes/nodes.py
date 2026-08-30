@@ -71,6 +71,15 @@ class BinaryOp(Node):
         return f"BinaryOp({self.operator!r}, {self.left!r}, {self.right!r})"
 
 
+class UnaryOp(Node):
+    def __init__(self, operator: str, operand: Node):
+        self.operator = operator
+        self.operand = operand
+
+    def __repr__(self):
+        return f"UnaryOp({self.operator!r}, {self.operand!r})"
+
+
 class IfStatement(Node):
     def __init__(
         self,

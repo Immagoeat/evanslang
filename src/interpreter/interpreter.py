@@ -8,6 +8,7 @@ from nodes.nodes import (
     PrintStatement,
     Program,
     StringLiteral,
+    UnaryOp,
     VarDecl,
 )
 from utils.errors import EvansLangError
@@ -64,6 +65,25 @@ class Interpreter:
             right = self._evaluate(node.right)
             if node.operator == "==":
                 return left == right
+            if node.operator == "!=":
+                return left != right
+            if node.operator == "&&":
+                return bool(left) and bool(right)
+            if node.operator == "||":
+                return bool(left) or bool(right)
+            if node.operator in ("<", "<=", ">", ">="):
+                try:
+                    if node.operator == "<":
+                        return left < right
+                    if node.operator == "<=":
+                        return left <= right
+                    if node.operator == ">":
+                        return left > right
+                    return left >= right
+                except TypeError:
+                    raise EvansLangError(
+                        f"Cannot compare {type(left).__name__} with {type(right).__name__} using {node.operator!r}"
+                    )
             if node.operator == "+":
                 return left + right
             if node.operator == "-":
@@ -74,5 +94,9 @@ class Interpreter:
                 if right == 0:
                     raise EvansLangError("Division by zero")
                 return left // right
+            raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
+        if isinstance(node, UnaryOp):
+            if node.operator == "!":
+                return not self._evaluate(node.operand)
             raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
         raise NotImplementedError(f"Cannot evaluate node: {node!r}")

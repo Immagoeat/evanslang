@@ -32,6 +32,37 @@ class VM:
                 right = self.stack.pop()
                 left = self.stack.pop()
                 self.stack.append(left == right)
+            elif instruction.opcode == OpCode.NEQ:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(left != right)
+            elif instruction.opcode == OpCode.LT:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(self._compare(left, right, "<"))
+            elif instruction.opcode == OpCode.LTE:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(self._compare(left, right, "<="))
+            elif instruction.opcode == OpCode.GT:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(self._compare(left, right, ">"))
+            elif instruction.opcode == OpCode.GTE:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(self._compare(left, right, ">="))
+            elif instruction.opcode == OpCode.AND:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(bool(left) and bool(right))
+            elif instruction.opcode == OpCode.OR:
+                right = self.stack.pop()
+                left = self.stack.pop()
+                self.stack.append(bool(left) or bool(right))
+            elif instruction.opcode == OpCode.NOT:
+                value = self.stack.pop()
+                self.stack.append(not value)
             elif instruction.opcode == OpCode.ADD:
                 right = self.stack.pop()
                 left = self.stack.pop()
@@ -63,3 +94,17 @@ class VM:
             else:
                 raise NotImplementedError(f"Unknown opcode: {instruction.opcode}")
             pc += 1
+
+    def _compare(self, left, right, operator: str) -> bool:
+        try:
+            if operator == "<":
+                return left < right
+            if operator == "<=":
+                return left <= right
+            if operator == ">":
+                return left > right
+            return left >= right
+        except TypeError:
+            raise EvansLangError(
+                f"Cannot compare {type(left).__name__} with {type(right).__name__} using {operator!r}"
+            )

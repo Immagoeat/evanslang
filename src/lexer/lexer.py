@@ -58,6 +58,37 @@ class Lexer:
                 return Token(TokenType.EQUALS_EQUALS, "==", line, column)
             return Token(TokenType.EQUALS, "=", line, column)
 
+        if char == "!":
+            self._advance()
+            if self.pos < len(self.source) and self.source[self.pos] == "=":
+                self._advance()
+                return Token(TokenType.NOT_EQUALS, "!=", line, column)
+            return Token(TokenType.BANG, "!", line, column)
+
+        if char == "<":
+            self._advance()
+            if self.pos < len(self.source) and self.source[self.pos] == "=":
+                self._advance()
+                return Token(TokenType.LESS_EQUALS, "<=", line, column)
+            return Token(TokenType.LESS, "<", line, column)
+
+        if char == ">":
+            self._advance()
+            if self.pos < len(self.source) and self.source[self.pos] == "=":
+                self._advance()
+                return Token(TokenType.GREATER_EQUALS, ">=", line, column)
+            return Token(TokenType.GREATER, ">", line, column)
+
+        if char == "&" and self._peek_char(1) == "&":
+            self._advance()
+            self._advance()
+            return Token(TokenType.AND_AND, "&&", line, column)
+
+        if char == "|" and self._peek_char(1) == "|":
+            self._advance()
+            self._advance()
+            return Token(TokenType.OR_OR, "||", line, column)
+
         if char == "+" and self._peek_char(1) == "=":
             self._advance()
             self._advance()
