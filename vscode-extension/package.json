@@ -1,0 +1,39 @@
+{
+  "name": "evanslang",
+  "displayName": "evanslang",
+  "description": "Syntax highlighting and autocomplete for evanslang (.el files)",
+  "version": "0.1.0",
+  "publisher": "evanslang-local",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onLanguage:evanslang"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "evanslang",
+        "aliases": [
+          "evanslang",
+          "evl"
+        ],
+        "extensions": [
+          ".el"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "evanslang",
+        "scopeName": "source.evanslang",
+        "path": "./syntaxes/evanslang.tmLanguage.json"
+      }
+    ]
+  }
+}

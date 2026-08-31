@@ -32,3 +32,8 @@ See `evlng --help` for all options.
 
 - [`docs/language_spec.md`](docs/language_spec.md) — language syntax and semantics
 - [`docs/architecture.md`](docs/architecture.md) — compiler pipeline and internals
+
+## Editor support
+
+[`vscode-extension/`](vscode-extension/) has syntax highlighting and basic
+autocomplete for `.el` files — see its README for local install steps.

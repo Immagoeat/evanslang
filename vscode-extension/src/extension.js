@@ -1,0 +1,124 @@
+const vscode = require("vscode");
+
+const KEYWORDS = ["class", "var", "if", "elseif", "else", "while", "for", "ment", "mentions"];
+const TYPES = ["int", "str", "float", "bool"];
+const BUILTINS = ["print", "input"];
+const BOOLEAN_LITERALS = ["true", "false"];
+
+function keywordCompletions() {
+  return KEYWORDS.map((word) => {
+    const item = new vscode.CompletionItem(word, vscode.CompletionItemKind.Keyword);
+    return item;
+  });
+}
+
+function typeCompletions() {
+  return TYPES.map((word) => {
+    const item = new vscode.CompletionItem(word, vscode.CompletionItemKind.TypeParameter);
+    return item;
+  });
+}
+
+function builtinCompletions() {
+  const items = [];
+
+  const print = new vscode.CompletionItem("print", vscode.CompletionItemKind.Function);
+  print.detail = "print(<expression>);";
+  print.insertText = new vscode.SnippetString('print(${1:value});');
+  items.push(print);
+
+  const input = new vscode.CompletionItem("input", vscode.CompletionItemKind.Function);
+  input.detail = 'input("<prompt>")';
+  input.insertText = new vscode.SnippetString('input("${1:prompt}")');
+  items.push(input);
+
+  const parseCall = new vscode.CompletionItem("parse", vscode.CompletionItemKind.Method);
+  parseCall.detail = "<str variable>.parse(<type>)";
+  parseCall.insertText = new vscode.SnippetString("parse(${1|int,float,bool,str|})");
+  items.push(parseCall);
+
+  return items;
+}
+
+function booleanCompletions() {
+  return BOOLEAN_LITERALS.map((word) => {
+    return new vscode.CompletionItem(word, vscode.CompletionItemKind.Value);
+  });
+}
+
+function snippetCompletions() {
+  const items = [];
+
+  const mainClass = new vscode.CompletionItem("class main", vscode.CompletionItemKind.Snippet);
+  mainClass.insertText = new vscode.SnippetString(
+    "class main() {\n\t$0\n}"
+  );
+  mainClass.detail = "Program entry point";
+  items.push(mainClass);
+
+  const initClass = new vscode.CompletionItem("class init", vscode.CompletionItemKind.Snippet);
+  initClass.insertText = new vscode.SnippetString(
+    "class init() {\n\t$0\n}"
+  );
+  initClass.detail = "Runs once, before main";
+  items.push(initClass);
+
+  const mentClass = new vscode.CompletionItem("class (ment)", vscode.CompletionItemKind.Snippet);
+  mentClass.insertText = new vscode.SnippetString(
+    "class ${1:Name}(ment) {\n\t$0\n}"
+  );
+  mentClass.detail = "Class callable from other files via @mentions";
+  items.push(mentClass);
+
+  const varDecl = new vscode.CompletionItem("var", vscode.CompletionItemKind.Snippet);
+  varDecl.insertText = new vscode.SnippetString(
+    "var ${1:name}: ${2|int,str,float,bool|} = ${3:value};"
+  );
+  varDecl.detail = "Variable declaration";
+  items.push(varDecl);
+
+  const ifStmt = new vscode.CompletionItem("if", vscode.CompletionItemKind.Snippet);
+  ifStmt.insertText = new vscode.SnippetString("if (${1:condition}) {\n\t$0\n}");
+  items.push(ifStmt);
+
+  const whileStmt = new vscode.CompletionItem("while", vscode.CompletionItemKind.Snippet);
+  whileStmt.insertText = new vscode.SnippetString("while (${1:condition}) {\n\t$0\n}");
+  items.push(whileStmt);
+
+  const forStmt = new vscode.CompletionItem("for", vscode.CompletionItemKind.Snippet);
+  forStmt.insertText = new vscode.SnippetString(
+    "for (var ${1:i}: int = 0; ${1:i} < ${2:10}; ${1:i} += 1) {\n\t$0\n}"
+  );
+  items.push(forStmt);
+
+  const mentionStmt = new vscode.CompletionItem("@mentions", vscode.CompletionItemKind.Snippet);
+  mentionStmt.insertText = new vscode.SnippetString(
+    "@mentions ${1:file}.el -> ${2:alias};"
+  );
+  items.push(mentionStmt);
+
+  return items;
+}
+
+function activate(context) {
+  const provider = vscode.languages.registerCompletionItemProvider(
+    "evanslang",
+    {
+      provideCompletionItems() {
+        return [
+          ...keywordCompletions(),
+          ...typeCompletions(),
+          ...builtinCompletions(),
+          ...booleanCompletions(),
+          ...snippetCompletions(),
+        ];
+      },
+    }
+  );
+
+  context.subscriptions.push(provider);
+}
+
+function deactivate() {}
+
+module.exports = { activate, deactivate };
