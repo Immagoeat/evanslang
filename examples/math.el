@@ -1,10 +1,12 @@
-var bob: int = 10;
-print(bob);
-bob += 3;
-print(bob);
-bob -= 3;
-print(bob);
-bob *= 3;
-print(bob);
-bob /= 29;
-print(bob);
+class main() {
+    var bob: int = 10;
+    print(bob);
+    bob += 3;
+    print(bob);
+    bob -= 3;
+    print(bob);
+    bob *= 3;
+    print(bob);
+    bob /= 29;
+    print(bob);
+}

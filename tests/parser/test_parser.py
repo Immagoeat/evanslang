@@ -26,9 +26,14 @@ from parser.parser import Parser
 from utils.errors import ParseError
 
 
+def parse_program(source: str):
+    wrapped = f"class main() {{\n{source}\n}}"
+    tokens = Lexer(wrapped).tokenize()
+    return Parser(tokens).parse()
+
+
 def test_parses_print_statement():
-    tokens = Lexer('print("Hello, World!");').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('print("Hello, World!");')
 
     assert len(program.statements) == 1
     statement = program.statements[0]
@@ -38,8 +43,7 @@ def test_parses_print_statement():
 
 
 def test_parses_str_var_decl():
-    tokens = Lexer('var EXAMPLE: str = "Hello";').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('var EXAMPLE: str = "Hello";')
 
     statement = program.statements[0]
     assert isinstance(statement, VarDecl)
@@ -50,8 +54,7 @@ def test_parses_str_var_decl():
 
 
 def test_parses_int_var_decl():
-    tokens = Lexer("var COUNT: int = 9;").tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program("var COUNT: int = 9;")
 
     statement = program.statements[0]
     assert isinstance(statement, VarDecl)
@@ -62,14 +65,12 @@ def test_parses_int_var_decl():
 
 
 def test_rejects_mismatched_var_type():
-    tokens = Lexer('var COUNT: int = "nope";').tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program('var COUNT: int = "nope";')
 
 
 def test_parses_var_decl_without_value():
-    tokens = Lexer("var bob: str;").tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program("var bob: str;")
 
     statement = program.statements[0]
     assert isinstance(statement, VarDecl)
@@ -79,8 +80,7 @@ def test_parses_var_decl_without_value():
 
 
 def test_parses_assignment_with_input_call():
-    tokens = Lexer('var bob: str;\nbob = input("MESSAGE");').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('var bob: str;\nbob = input("MESSAGE");')
 
     assign = program.statements[1]
     assert isinstance(assign, Assignment)
@@ -90,20 +90,17 @@ def test_parses_assignment_with_input_call():
 
 
 def test_rejects_assignment_to_undeclared_variable():
-    tokens = Lexer('undeclared = "x";').tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program('undeclared = "x";')
 
 
 def test_rejects_input_assigned_to_int_variable():
-    tokens = Lexer('var n: int;\nn = input("x");').tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program('var n: int;\nn = input("x");')
 
 
 def test_parses_if_statement():
-    tokens = Lexer('var bob: str = "Hi";\nif (bob == "Hi") {\nprint(bob);\n}').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('var bob: str = "Hi";\nif (bob == "Hi") {\nprint(bob);\n}')
 
     if_stmt = program.statements[1]
     assert isinstance(if_stmt, IfStatement)
@@ -114,9 +111,8 @@ def test_parses_if_statement():
 
 
 def test_rejects_unterminated_if_block():
-    tokens = Lexer('var x: int = 1;\nif (x == 1) {\nprint(x);\n').tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program('var x: int = 1;\nif (x == 1) {\nprint(x);\n')
 
 
 def test_parses_if_elseif_else_chain():
@@ -128,8 +124,7 @@ def test_parses_if_elseif_else_chain():
         "}\n"
         "else {}\n"
     )
-    tokens = Lexer(source).tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program(source)
 
     if_stmt = program.statements[1]
     assert isinstance(if_stmt, IfStatement)
@@ -147,8 +142,7 @@ def test_parses_if_with_trailing_semicolons():
         'elseif (bob == "Hello") {};\n'
         "else {};\n"
     )
-    tokens = Lexer(source).tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program(source)
 
     if_stmt = program.statements[1]
     assert isinstance(if_stmt, IfStatement)
@@ -157,8 +151,7 @@ def test_parses_if_with_trailing_semicolons():
 
 
 def test_parses_if_without_elseif_or_else():
-    tokens = Lexer('var bob: str = "Hi";\nif (bob == "Hi") {}\n').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('var bob: str = "Hi";\nif (bob == "Hi") {}\n')
 
     if_stmt = program.statements[1]
     assert if_stmt.elif_branches == []
@@ -166,8 +159,7 @@ def test_parses_if_without_elseif_or_else():
 
 
 def test_parses_compound_assignment():
-    tokens = Lexer("var bob: int = 10;\nbob += 3;").tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program("var bob: int = 10;\nbob += 3;")
 
     assign = program.statements[1]
     assert isinstance(assign, Assignment)
@@ -182,16 +174,14 @@ def test_parses_compound_assignment():
 
 def test_parses_all_compound_operators():
     source = "var bob: int = 10;\nbob += 3;\nbob -= 3;\nbob *= 3;\nbob /= 3;\n"
-    tokens = Lexer(source).tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program(source)
 
     operators = [stmt.value.operator for stmt in program.statements[1:]]
     assert operators == ["+", "-", "*", "/"]
 
 
 def test_parses_compound_assignment_with_identifier_rhs():
-    tokens = Lexer("var a: int = 5;\nvar b: int = 3;\na += b;").tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program("var a: int = 5;\nvar b: int = 3;\na += b;")
 
     assign = program.statements[2]
     assert isinstance(assign.value, BinaryOp)
@@ -200,21 +190,18 @@ def test_parses_compound_assignment_with_identifier_rhs():
 
 
 def test_rejects_compound_assignment_to_undeclared_variable():
-    tokens = Lexer("x += 1;").tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program("x += 1;")
 
 
 def test_rejects_compound_assignment_on_str_variable():
-    tokens = Lexer('var s: str = "hi";\ns += 1;').tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program('var s: str = "hi";\ns += 1;')
 
 
 def test_rejects_compound_assignment_with_str_rhs():
-    tokens = Lexer('var n: int = 1;\nn += "x";').tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program('var n: int = 1;\nn += "x";')
 
 
 def test_parses_all_comparison_operators():
@@ -256,8 +243,7 @@ def test_parses_not_on_identifier():
 
 
 def test_parses_float_var_decl():
-    tokens = Lexer("var pi: float = 3.14;").tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program("var pi: float = 3.14;")
 
     statement = program.statements[0]
     assert isinstance(statement, VarDecl)
@@ -267,8 +253,7 @@ def test_parses_float_var_decl():
 
 
 def test_parses_bool_var_decl_true_and_false():
-    tokens = Lexer("var flag: bool = true;\nvar other: bool = false;").tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program("var flag: bool = true;\nvar other: bool = false;")
 
     flag_decl, other_decl = program.statements
     assert isinstance(flag_decl.value, BoolLiteral) and flag_decl.value.value is True
@@ -276,26 +261,22 @@ def test_parses_bool_var_decl_true_and_false():
 
 
 def test_rejects_int_literal_for_float_variable():
-    tokens = Lexer("var f: float = 5;").tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program("var f: float = 5;")
 
 
 def test_rejects_float_literal_for_int_variable():
-    tokens = Lexer("var n: int = 5.0;").tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program("var n: int = 5.0;")
 
 
 def test_rejects_non_bool_for_bool_variable():
-    tokens = Lexer('var b: bool = "x";').tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program('var b: bool = "x";')
 
 
 def test_parses_compound_assignment_on_float_variable():
-    tokens = Lexer("var f: float = 1.0;\nf += 2.5;").tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program("var f: float = 1.0;\nf += 2.5;")
 
     assign = program.statements[1]
     assert isinstance(assign, Assignment)
@@ -305,20 +286,17 @@ def test_parses_compound_assignment_on_float_variable():
 
 
 def test_rejects_int_literal_in_float_compound_assignment():
-    tokens = Lexer("var f: float = 1.0;\nf += 2;").tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program("var f: float = 1.0;\nf += 2;")
 
 
 def test_rejects_mixing_int_and_float_variables_in_compound_assignment():
-    tokens = Lexer("var f: float = 1.0;\nvar n: int = 2;\nf += n;").tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program("var f: float = 1.0;\nvar n: int = 2;\nf += n;")
 
 
 def test_parses_dot_parse_in_var_decl():
-    tokens = Lexer('var bob: str = "42";\nvar n: int = bob.parse;').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('var bob: str = "42";\nvar n: int = bob.parse;')
 
     decl = program.statements[1]
     assert isinstance(decl, VarDecl)
@@ -329,16 +307,14 @@ def test_parses_dot_parse_in_var_decl():
 
 
 def test_parses_dot_parse_for_float_target():
-    tokens = Lexer('var bob: str = "3.14";\nvar f: float = bob.parse;').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('var bob: str = "3.14";\nvar f: float = bob.parse;')
 
     decl = program.statements[1]
     assert isinstance(decl.value, ParseCall)
 
 
 def test_parses_bare_dot_parse_as_expression_statement():
-    tokens = Lexer('var bob: str = "42";\nbob.parse;').tokenize()
-    program = Parser(tokens).parse()
+    program = parse_program('var bob: str = "42";\nbob.parse;')
 
     stmt = program.statements[1]
     assert isinstance(stmt, ExpressionStatement)
@@ -347,18 +323,55 @@ def test_parses_bare_dot_parse_as_expression_statement():
 
 
 def test_rejects_dot_parse_on_non_str_variable():
-    tokens = Lexer("var n: int = 5;\nvar m: int = n.parse;").tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program("var n: int = 5;\nvar m: int = n.parse;")
 
 
 def test_rejects_dot_parse_on_undeclared_variable():
-    tokens = Lexer("var n: int = x.parse;").tokenize()
     with pytest.raises(ParseError):
-        Parser(tokens).parse()
+        parse_program("var n: int = x.parse;")
 
 
 def test_rejects_dot_parse_assigned_to_bool():
-    tokens = Lexer('var s: str = "true";\nvar b: bool = s.parse;').tokenize()
+    with pytest.raises(ParseError):
+        parse_program('var s: str = "true";\nvar b: bool = s.parse;')
+
+
+def test_parses_class_main_wrapper():
+    tokens = Lexer('class main() {\nprint("hi");\n}').tokenize()
+    program = Parser(tokens).parse()
+
+    assert len(program.statements) == 1
+    assert isinstance(program.statements[0], PrintStatement)
+
+
+def test_parses_class_main_with_trailing_semicolon():
+    tokens = Lexer('class main() {\nprint("hi");\n};').tokenize()
+    program = Parser(tokens).parse()
+
+    assert len(program.statements) == 1
+
+
+def test_rejects_missing_class_main():
+    tokens = Lexer('print("hi");').tokenize()
     with pytest.raises(ParseError):
         Parser(tokens).parse()
+
+
+def test_rejects_wrong_class_name():
+    tokens = Lexer('class foo() {\nprint("hi");\n}').tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_content_after_class_main():
+    tokens = Lexer('class main() {\nprint("hi");\n}\nprint("outside");').tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_parses_empty_class_main():
+    tokens = Lexer("class main() {}").tokenize()
+    program = Parser(tokens).parse()
+
+    assert program.statements == []

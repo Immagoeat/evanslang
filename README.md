@@ -9,11 +9,14 @@ Add `bin/` to your `PATH` (or call `bin/evlng` directly):
 export PATH="$PATH:$(pwd)/bin"
 ```
 
-Write a program (`.el` file):
+Write a program (`.el` file). Every program's body must live inside
+`class main() { ... }`:
 
 ```
-var EXAMPLE: str = "Hello";
-print(EXAMPLE);
+class main() {
+    var EXAMPLE: str = "Hello";
+    print(EXAMPLE);
+}
 ```
 
 Build and run it:

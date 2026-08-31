@@ -1,3 +1,5 @@
-var bob: str = "Hi";
+class main() {
+    var bob: str = "Hi";
 
-print(bob);
+    print(bob);
+}

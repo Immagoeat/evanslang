@@ -44,9 +44,21 @@ class Parser:
         self.declared_types: dict[str, str] = {}
 
     def parse(self) -> Program:
-        statements = []
-        while self._peek().type != TokenType.EOF:
-            statements.append(self._parse_statement())
+        self._expect(TokenType.IDENTIFIER, "class")
+        self._expect(TokenType.IDENTIFIER, "main")
+        self._expect(TokenType.LPAREN)
+        self._expect(TokenType.RPAREN)
+        statements = self._parse_block()
+        self._skip_optional_semicolon()
+
+        if self._peek().type != TokenType.EOF:
+            token = self._peek()
+            raise ParseError(
+                f"Unexpected token {token.value!r} after 'class main() {{}}'",
+                token.line,
+                token.column,
+            )
+
         return Program(statements)
 
     def _parse_statement(self):

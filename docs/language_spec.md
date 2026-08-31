@@ -2,6 +2,29 @@
 
 Source files use the `.el` extension.
 
+## Program structure
+
+```
+class main() {
+    <statement>*
+}
+```
+
+Every program's entire body must be inside `class main() { ... }` — it is
+the mandatory entry point, similar to `main` in Java or C#. There is
+nothing else at the top level: no statements before/after/outside the
+block, and no other classes. A single optional `;` is allowed right after
+the closing `}` (`class main() {...};`), purely cosmetic. `class main()`
+is not itself a general-purpose class construct yet — it has no fields, no
+methods beyond its body, and can't be instantiated; it exists solely to
+mark where the program starts.
+
+```
+class main() {
+    print("Hello, World!");
+}
+```
+
 ## Statements
 
 ### print
@@ -226,7 +249,7 @@ print(pi);
 ## Grammar (informal)
 
 ```
-program        := statement*
+program        := "class" "main" "(" ")" block ";"?
 statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt | exprStmt
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
@@ -256,3 +279,4 @@ inputCall      := "input" "(" STRING ")"
 - Functions
 - Block comments (`#` only comments to end of line)
 - `.parse`-equivalent for `bool` (a `str` can't currently be converted to `bool`)
+- Real classes: fields, methods, instantiation (`new`), multiple classes, inheritance — `class main()` currently only marks the program's entry point
