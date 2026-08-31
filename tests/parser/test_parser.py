@@ -20,6 +20,8 @@ from nodes.nodes import (
     ParseCall,
     PrintStatement,
     StringLiteral,
+    ThrowStatement,
+    TryStatement,
     UnaryOp,
     VarDecl,
     WhileStatement,
@@ -576,3 +578,80 @@ def test_allows_calling_a_mentioned_files_main_via_alias():
     assert isinstance(call, CallStatement)
     assert call.alias == "lib"
     assert call.name == "main"
+
+
+def test_parses_additive_and_multiplicative_precedence():
+    statements = parse_program("var a: int = 2 + 3 * 4;")
+    value = statements[0].value
+
+    assert isinstance(value, BinaryOp)
+    assert value.operator == "+"
+    assert isinstance(value.left, IntLiteral)
+    assert value.left.value == 2
+    assert isinstance(value.right, BinaryOp)
+    assert value.right.operator == "*"
+
+
+def test_parses_parenthesized_expression_overriding_precedence():
+    statements = parse_program("var a: int = (2 + 3) * 4;")
+    value = statements[0].value
+
+    assert isinstance(value, BinaryOp)
+    assert value.operator == "*"
+    assert isinstance(value.left, BinaryOp)
+    assert value.left.operator == "+"
+    assert isinstance(value.right, IntLiteral)
+    assert value.right.value == 4
+
+
+def test_parses_unary_minus():
+    statements = parse_program("var a: int = -5;")
+    value = statements[0].value
+
+    assert isinstance(value, UnaryOp)
+    assert value.operator == "-"
+    assert isinstance(value.operand, IntLiteral)
+    assert value.operand.value == 5
+
+
+def test_rejects_arithmetic_assigned_to_str_variable():
+    with pytest.raises(ParseError):
+        parse_program("var a: str = 2 + 3;")
+
+
+def test_parses_try_catch():
+    statements = parse_program(
+        'try {\nprint("a");\n}\ncatch (e: str) {\nprint(e);\n}'
+    )
+
+    statement = statements[0]
+    assert isinstance(statement, TryStatement)
+    assert len(statement.try_body) == 1
+    assert statement.catch_var_name == "e"
+    assert len(statement.catch_body) == 1
+
+
+def test_parses_throw():
+    statements = parse_program('throw "oops";')
+
+    statement = statements[0]
+    assert isinstance(statement, ThrowStatement)
+    assert isinstance(statement.expression, StringLiteral)
+    assert statement.expression.value == "oops"
+
+
+def test_catch_variable_is_declared_as_str():
+    # catch (e: str) implicitly declares `e` as a str variable, so a later
+    # .parse(...) call on it (which requires a declared str) must parse.
+    statements = parse_program(
+        'try {\nthrow "x";\n}\ncatch (e: str) {\nvar n: int = e.parse(int);\n}'
+    )
+    catch_body = statements[0].catch_body
+    assert isinstance(catch_body[0], VarDecl)
+    assert isinstance(catch_body[0].value, ParseCall)
+    assert catch_body[0].value.target.name == "e"
+
+
+def test_rejects_try_without_catch():
+    with pytest.raises(ParseError):
+        parse_program('try {\nprint("a");\n}')

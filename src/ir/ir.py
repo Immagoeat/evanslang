@@ -27,6 +27,9 @@ class OpCode(Enum):
     CALL = auto()
     RETURN = auto()
     POP = auto()
+    TRY_BEGIN = auto()
+    TRY_END = auto()
+    THROW = auto()
     HALT = auto()
 
 

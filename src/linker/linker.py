@@ -7,6 +7,7 @@ from nodes.nodes import (
     ForStatement,
     IfStatement,
     Program,
+    TryStatement,
     WhileStatement,
 )
 from parser.parser import Parser
@@ -58,6 +59,8 @@ def _statements_in(node) -> list:
         if node.update is not None:
             nested.append(node.update)
         return nested
+    if isinstance(node, TryStatement):
+        return [*node.try_body, *node.catch_body]
     return []
 
 

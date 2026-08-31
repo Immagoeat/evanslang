@@ -308,6 +308,72 @@ for (; i < 3;) {
 }
 ```
 
+### try / catch / throw
+
+```
+try {
+    <statement>*
+}
+catch (<NAME>: str) {
+    <statement>*
+}
+```
+
+```
+throw <expression>;
+```
+
+`try { ... } catch (<NAME>: str) { ... }` runs the `try` block; if any
+statement inside it (directly, or anywhere inside a class it calls, no
+matter how deeply nested) raises a runtime error — either an explicit
+`throw`, or a built-in runtime error such as division by zero, an
+arithmetic/comparison type mismatch, or negating a non-numeric value — the
+rest of the `try` block is abandoned and the `catch` block runs instead,
+with `<NAME>` bound to the error's message as a `str` (`<NAME>: str`
+implicitly declares `<NAME>` the same as a `var`, visible for the rest of
+the `catch` block). If the `try` block completes without error, `catch`
+never runs. There is no `finally`, and `catch` is required — a `try` with
+no `catch` is a parse error.
+
+`throw <expression>;` raises a runtime error carrying `<expression>`'s
+value as the message. `<expression>` must evaluate to a `str` — throwing a
+non-`str` value is a runtime error (`throw` isn't statically type-checked
+against a literal string requirement, matching how arithmetic/comparison
+operand types are also runtime-only). An uncaught `throw` (or uncaught
+built-in error) propagates all the way out and is reported the same as any
+other runtime error.
+
+`try`/`catch` can nest, and a `catch` block can itself `throw` (including
+rethrowing) to be caught by an enclosing `try`. Errors thrown from deep
+inside a chain of called classes correctly unwind back to the nearest
+enclosing `try` in the caller, restoring the call stack to where the `try`
+began.
+
+```
+class risky() {
+    var a: int = 10;
+    var b: int = 0;
+    var result: int = a / b;
+}
+
+class main() {
+    try {
+        risky;
+    }
+    catch (e: str) {
+        print("caught:");
+        print(e);
+    }
+
+    try {
+        throw "something went wrong";
+    }
+    catch (e: str) {
+        print(e);
+    }
+}
+```
+
 ### comments
 
 ```
@@ -442,7 +508,7 @@ mention        := "@" "mentions" filename "->" IDENTIFIER ";"
 filename       := IDENTIFIER ("." IDENTIFIER)*
 classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
 statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt
-                  | whileStmt | forStmt | exprStmt | callStmt
+                  | whileStmt | forStmt | tryStmt | throwStmt | exprStmt | callStmt
 callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
@@ -454,6 +520,8 @@ ifStmt         := "if" "(" expression ")" block ";"?
 whileStmt      := "while" "(" expression ")" block ";"?
 forStmt        := "for" "(" forClause? ";" expression? ";" forClause? ")" block ";"?
 forClause      := varDecl' | assignment' | compoundAssign'   # same forms, no trailing ";"
+tryStmt        := "try" block "catch" "(" IDENTIFIER ":" "str" ")" block ";"?
+throwStmt      := "throw" expression ";"
 exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool"
@@ -483,3 +551,5 @@ time, not parse time) if it's the file actually being compiled/run.
 - String concatenation with `+`
 - Real OOP: fields, methods (beyond a single callable body), `new`/instantiation, `this`, inheritance, parameters, return values — classes are currently just named, callable blocks of statements
 - Quoted/path-style `@mentions` filenames (e.g. subdirectories) — the filename is a bare dotted identifier sequence, so it must look like a valid identifier chain (`utils.el`, not `"../lib/utils.el"`)
+- `finally` blocks
+- Custom/typed exceptions — every thrown or built-in error is just a `str` message; there's no error "kind" to distinguish or match on beyond the message text itself

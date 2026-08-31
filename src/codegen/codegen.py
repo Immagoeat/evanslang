@@ -13,6 +13,8 @@ from nodes.nodes import (
     ParseCall,
     PrintStatement,
     StringLiteral,
+    ThrowStatement,
+    TryStatement,
     UnaryOp,
     VarDecl,
     WhileStatement,
@@ -126,7 +128,38 @@ class CodeGenerator:
                 *self._generate_expression(node.expression),
                 Instruction(OpCode.POP),
             ]
+        if isinstance(node, TryStatement):
+            return self._generate_try(node)
+        if isinstance(node, ThrowStatement):
+            return [
+                *self._generate_expression(node.expression),
+                Instruction(OpCode.THROW),
+            ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")
+
+    def _generate_try(self, node: TryStatement) -> list[Instruction]:
+        try_instrs: list[Instruction] = []
+        for statement in node.try_body:
+            try_instrs.extend(self._generate_statement(statement))
+
+        catch_instrs: list[Instruction] = [
+            Instruction(OpCode.STORE, node.catch_var_name)
+        ]
+        for statement in node.catch_body:
+            catch_instrs.extend(self._generate_statement(statement))
+
+        # Layout: [TRY_BEGIN <past try body+TRY_END+JUMP, to catch>,
+        #          try body..., TRY_END, JUMP <past catch>,
+        #          STORE <catch_var>, catch body...]
+        try_begin = Instruction(OpCode.TRY_BEGIN, len(try_instrs) + 3)
+        jump_past_catch = Instruction(OpCode.JUMP, len(catch_instrs) + 1)
+        return [
+            try_begin,
+            *try_instrs,
+            Instruction(OpCode.TRY_END),
+            jump_past_catch,
+            *catch_instrs,
+        ]
 
     def _generate_if(self, node: IfStatement) -> list[Instruction]:
         branches = [(node.condition, node.body), *node.elif_branches]

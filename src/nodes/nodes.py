@@ -162,6 +162,32 @@ class IfStatement(Node):
         )
 
 
+class TryStatement(Node):
+    def __init__(
+        self,
+        try_body: list[Node],
+        catch_var_name: str,
+        catch_body: list[Node],
+    ):
+        self.try_body = try_body
+        self.catch_var_name = catch_var_name
+        self.catch_body = catch_body
+
+    def __repr__(self):
+        return (
+            f"TryStatement({self.try_body!r}, catch_var_name={self.catch_var_name!r}, "
+            f"catch_body={self.catch_body!r})"
+        )
+
+
+class ThrowStatement(Node):
+    def __init__(self, expression: Node):
+        self.expression = expression
+
+    def __repr__(self):
+        return f"ThrowStatement({self.expression!r})"
+
+
 class ClassDecl(Node):
     def __init__(self, name: str, is_ment: bool, body: list[Node]):
         self.name = name

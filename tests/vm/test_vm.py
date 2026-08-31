@@ -121,3 +121,75 @@ def test_negating_a_bool_raises_clean_error():
         build_and_run(
             'class main() {\nvar a: bool = true;\nvar b: int = -a;\n}'
         )
+
+
+def test_try_catch_catches_a_throw():
+    lines = build_run_capture(
+        'class main() {\n'
+        'try {\nprint("before");\nthrow "boom";\nprint("skipped");\n}\n'
+        'catch (e: str) {\nprint(e);\n}\n'
+        'print("after");\n'
+        "}"
+    )
+    assert lines == ["before", "boom", "after"]
+
+
+def test_try_catch_catches_builtin_runtime_errors():
+    lines = build_run_capture(
+        'class main() {\n'
+        'var a: int = 5;\nvar b: int = 0;\n'
+        "try {\nvar c: int = a / b;\n}\n"
+        'catch (e: str) {\nprint(e);\n}\n'
+        "}"
+    )
+    assert lines == ["Division by zero"]
+
+
+def test_try_catch_unwinds_call_stack_from_nested_calls():
+    lines = build_run_capture(
+        'class deepest() {\nthrow "deep failure";\n}\n'
+        'class middle() {\ndeepest;\n}\n'
+        'class main() {\n'
+        "try {\nmiddle;\nprint(\"skipped\");\n}\n"
+        'catch (e: str) {\nprint(e);\n}\n'
+        'print("still running");\n'
+        "}"
+    )
+    assert lines == ["deep failure", "still running"]
+
+
+def test_uncaught_throw_propagates_as_evanslang_error():
+    with pytest.raises(EvansLangError):
+        build_and_run('class main() {\nthrow "uncaught";\n}')
+
+
+def test_throwing_a_non_string_raises_clean_error():
+    with pytest.raises(EvansLangError):
+        build_and_run('class main() {\nthrow 5;\n}')
+
+
+def test_nested_try_catch_and_rethrow():
+    lines = build_run_capture(
+        'class main() {\n'
+        "try {\n"
+        "try {\nthrow \"inner\";\n}\n"
+        'catch (e: str) {\nprint(e);\nthrow "rethrown";\n}\n'
+        "}\n"
+        'catch (e: str) {\nprint(e);\n}\n'
+        "}"
+    )
+    assert lines == ["inner", "rethrown"]
+
+
+def test_try_catch_inside_a_loop_resets_each_iteration():
+    lines = build_run_capture(
+        'class main() {\n'
+        "var i: int = 0;\n"
+        "while (i < 3) {\n"
+        "try {\nif (i == 1) {\nthrow \"loop error\";\n}\nprint(i);\n}\n"
+        'catch (e: str) {\nprint(e);\n}\n'
+        "i += 1;\n"
+        "}\n"
+        "}"
+    )
+    assert lines == ["0", "loop error", "2"]

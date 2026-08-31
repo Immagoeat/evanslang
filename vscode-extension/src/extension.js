@@ -1,6 +1,6 @@
 const vscode = require("vscode");
 
-const KEYWORDS = ["class", "var", "if", "elseif", "else", "while", "for", "ment", "mentions"];
+const KEYWORDS = ["class", "var", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "ment", "mentions"];
 const TYPES = ["int", "str", "float", "bool"];
 const BUILTINS = ["print", "input"];
 const BOOLEAN_LITERALS = ["true", "false"];
@@ -96,6 +96,17 @@ function snippetCompletions() {
     "@mentions ${1:file}.el -> ${2:alias};"
   );
   items.push(mentionStmt);
+
+  const tryStmt = new vscode.CompletionItem("try", vscode.CompletionItemKind.Snippet);
+  tryStmt.insertText = new vscode.SnippetString(
+    "try {\n\t$1\n}\ncatch (${2:e}: str) {\n\t$0\n}"
+  );
+  tryStmt.detail = "try { ... } catch (e: str) { ... }";
+  items.push(tryStmt);
+
+  const throwStmt = new vscode.CompletionItem("throw", vscode.CompletionItemKind.Snippet);
+  throwStmt.insertText = new vscode.SnippetString('throw "${1:message}";');
+  items.push(throwStmt);
 
   return items;
 }

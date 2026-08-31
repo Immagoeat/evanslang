@@ -16,6 +16,8 @@ from nodes.nodes import (
     PrintStatement,
     Program,
     StringLiteral,
+    ThrowStatement,
+    TryStatement,
     UnaryOp,
     VarDecl,
     WhileStatement,
@@ -163,6 +165,10 @@ class Parser:
             return self._parse_while_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "for":
             return self._parse_for_statement()
+        if token.type == TokenType.IDENTIFIER and token.value == "try":
+            return self._parse_try_statement()
+        if token.type == TokenType.IDENTIFIER and token.value == "throw":
+            return self._parse_throw_statement()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
             return self._parse_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
@@ -305,6 +311,31 @@ class Parser:
         body = self._parse_block()
         self._skip_optional_semicolon()
         return ForStatement(init, condition, update, body)
+
+    def _parse_try_statement(self) -> TryStatement:
+        self._expect(TokenType.IDENTIFIER, "try")
+        try_body = self._parse_block()
+
+        self._expect(TokenType.IDENTIFIER, "catch")
+        self._expect(TokenType.LPAREN)
+        catch_var_token = self._expect(TokenType.IDENTIFIER)
+        self._expect(TokenType.COLON)
+        type_token = self._expect(TokenType.IDENTIFIER, "str")
+        self._expect(TokenType.RPAREN)
+
+        # catch (e: str) implicitly declares `e` as a str variable, visible
+        # for the rest of the catch block - the same as any other `var`.
+        self.declared_types[catch_var_token.value] = type_token.value
+        catch_body = self._parse_block()
+        self._skip_optional_semicolon()
+
+        return TryStatement(try_body, catch_var_token.value, catch_body)
+
+    def _parse_throw_statement(self) -> ThrowStatement:
+        self._expect(TokenType.IDENTIFIER, "throw")
+        expression = self._parse_expression()
+        self._expect(TokenType.SEMICOLON)
+        return ThrowStatement(expression)
 
     def _parse_for_clause_statement(self):
         # The init/update clauses of a for-header are statements without

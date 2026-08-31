@@ -13,6 +13,8 @@ from nodes.nodes import (
     ParseCall,
     PrintStatement,
     StringLiteral,
+    ThrowStatement,
+    TryStatement,
     UnaryOp,
     VarDecl,
     WhileStatement,
@@ -106,6 +108,22 @@ class Interpreter:
                 if node.update is not None:
                     self._execute(node.update)
             return
+        if isinstance(node, TryStatement):
+            try:
+                for statement in node.try_body:
+                    self._execute(statement)
+            except EvansLangError as error:
+                self.variables[node.catch_var_name] = error.message
+                for statement in node.catch_body:
+                    self._execute(statement)
+            return
+        if isinstance(node, ThrowStatement):
+            value = self._evaluate(node.expression)
+            if not isinstance(value, str):
+                raise EvansLangError(
+                    f"Cannot throw a {type(value).__name__} (expected str)"
+                )
+            raise EvansLangError(value)
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 
     def _evaluate(self, node):
