@@ -5,6 +5,7 @@ from nodes.nodes import (
     CallStatement,
     ExpressionStatement,
     FloatLiteral,
+    ForStatement,
     Identifier,
     IfStatement,
     InputCall,
@@ -14,6 +15,7 @@ from nodes.nodes import (
     StringLiteral,
     UnaryOp,
     VarDecl,
+    WhileStatement,
 )
 from linker.linker import SEPARATOR, ResolvedProgram
 from utils.errors import EvansLangError
@@ -83,6 +85,20 @@ class Interpreter:
             return
         if isinstance(node, ExpressionStatement):
             self._evaluate(node.expression)
+            return
+        if isinstance(node, WhileStatement):
+            while self._evaluate(node.condition):
+                for statement in node.body:
+                    self._execute(statement)
+            return
+        if isinstance(node, ForStatement):
+            if node.init is not None:
+                self._execute(node.init)
+            while node.condition is None or self._evaluate(node.condition):
+                for statement in node.body:
+                    self._execute(statement)
+                if node.update is not None:
+                    self._execute(node.update)
             return
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 

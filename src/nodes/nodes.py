@@ -112,6 +112,35 @@ class UnaryOp(Node):
         return f"UnaryOp({self.operator!r}, {self.operand!r})"
 
 
+class WhileStatement(Node):
+    def __init__(self, condition: Node, body: list[Node]):
+        self.condition = condition
+        self.body = body
+
+    def __repr__(self):
+        return f"WhileStatement({self.condition!r}, {self.body!r})"
+
+
+class ForStatement(Node):
+    def __init__(
+        self,
+        init: Node | None,
+        condition: Node | None,
+        update: Node | None,
+        body: list[Node],
+    ):
+        self.init = init
+        self.condition = condition
+        self.update = update
+        self.body = body
+
+    def __repr__(self):
+        return (
+            f"ForStatement(init={self.init!r}, condition={self.condition!r}, "
+            f"update={self.update!r}, body={self.body!r})"
+        )
+
+
 class IfStatement(Node):
     def __init__(
         self,

@@ -5,6 +5,7 @@ from nodes.nodes import (
     CallStatement,
     ExpressionStatement,
     FloatLiteral,
+    ForStatement,
     Identifier,
     IfStatement,
     InputCall,
@@ -14,6 +15,7 @@ from nodes.nodes import (
     StringLiteral,
     UnaryOp,
     VarDecl,
+    WhileStatement,
 )
 from ir.ir import Instruction, OpCode
 from ir.ir import Program as IrProgram
@@ -106,6 +108,10 @@ class CodeGenerator:
             ]
         if isinstance(node, IfStatement):
             return self._generate_if(node)
+        if isinstance(node, WhileStatement):
+            return self._generate_while(node)
+        if isinstance(node, ForStatement):
+            return self._generate_for(node)
         if isinstance(node, ExpressionStatement):
             return [
                 *self._generate_expression(node.expression),
@@ -161,6 +167,53 @@ class CodeGenerator:
             instructions.extend(block)
         instructions.extend(else_instrs)
         return instructions
+
+    def _generate_while(self, node: WhileStatement) -> list[Instruction]:
+        cond_instrs = self._generate_expression(node.condition)
+        body_instrs: list[Instruction] = []
+        for statement in node.body:
+            body_instrs.extend(self._generate_statement(statement))
+
+        # Layout: [condition..., JUMP_IF_FALSE <past body+JUMP>, body..., JUMP <back to condition>]
+        jump_if_false = Instruction(OpCode.JUMP_IF_FALSE, len(body_instrs) + 2)
+        jump_back = Instruction(
+            OpCode.JUMP, -(len(cond_instrs) + 1 + len(body_instrs))
+        )
+        return [*cond_instrs, jump_if_false, *body_instrs, jump_back]
+
+    def _generate_for(self, node: ForStatement) -> list[Instruction]:
+        init_instrs = (
+            self._generate_statement(node.init) if node.init is not None else []
+        )
+        cond_instrs = (
+            self._generate_expression(node.condition)
+            if node.condition is not None
+            else [Instruction(OpCode.PUSH_CONST, True)]
+        )
+        update_instrs = (
+            self._generate_statement(node.update) if node.update is not None else []
+        )
+        body_instrs: list[Instruction] = []
+        for statement in node.body:
+            body_instrs.extend(self._generate_statement(statement))
+
+        # Layout: [init..., condition..., JUMP_IF_FALSE <past body+update+JUMP>,
+        #          body..., update..., JUMP <back to condition>]
+        jump_if_false = Instruction(
+            OpCode.JUMP_IF_FALSE, len(body_instrs) + len(update_instrs) + 2
+        )
+        jump_back = Instruction(
+            OpCode.JUMP,
+            -(len(cond_instrs) + 1 + len(body_instrs) + len(update_instrs)),
+        )
+        return [
+            *init_instrs,
+            *cond_instrs,
+            jump_if_false,
+            *body_instrs,
+            *update_instrs,
+            jump_back,
+        ]
 
     def _generate_expression(self, node) -> list[Instruction]:
         if isinstance(node, StringLiteral):

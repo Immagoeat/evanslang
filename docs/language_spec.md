@@ -216,6 +216,64 @@ else {
 }
 ```
 
+### while
+
+```
+while (<expression>) {
+    <statement>*
+}
+```
+
+Repeats the block for as long as `<expression>` is truthy, checked before
+every iteration (so a false condition means the body never runs). The body
+can be empty and can contain anything else the language supports,
+including `if`, nested loops, and calling classes. A single optional `;`
+is allowed right after the closing `}`.
+
+```
+var i: int = 0;
+while (i < 3) {
+    print(i);
+    i += 1;
+}
+```
+
+### for
+
+```
+for (<init>; <condition>; <update>) {
+    <statement>*
+}
+```
+
+A C-style loop: `<init>` runs once, before the first iteration;
+`<condition>` is checked before every iteration (a false condition ends
+the loop, or skips the body entirely if false from the start);
+`<update>` runs after each iteration's body, before the next check of
+`<condition>`. Each of `<init>`, `<condition>`, `<update>` is optional and
+may be omitted (`for (;;) {}` loops forever unless something inside the
+body stops it — evanslang has no `break`/`continue` yet, see "Not yet
+implemented").
+
+`<init>` and `<update>` must each be a `var` declaration, a plain
+assignment, or a compound assignment — the same statement forms allowed
+on their own line elsewhere, just without their own trailing `;` (the
+`for(...)`  header's `;`/`)` delimit them instead). A variable declared in
+`<init>` is visible for the rest of the enclosing block, the same as any
+other `var` (there's no per-loop variable scoping).
+
+```
+for (var j: int = 0; j < 3; j += 1) {
+    print(j);
+}
+
+# any clause can be omitted
+var i: int = 0;
+for (; i < 3;) {
+    i += 1;
+}
+```
+
 ### comments
 
 ```
@@ -331,7 +389,8 @@ program        := mention* classDecl+
 mention        := "@" "mentions" filename "->" IDENTIFIER ";"
 filename       := IDENTIFIER ("." IDENTIFIER)*
 classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
-statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt | exprStmt | callStmt
+statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt
+                  | whileStmt | forStmt | exprStmt | callStmt
 callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
@@ -340,6 +399,9 @@ compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") (INT | FLOAT | IDENTIFI
 ifStmt         := "if" "(" expression ")" block ";"?
                   ("elseif" "(" expression ")" block ";"?)*
                   ("else" block ";"?)?
+whileStmt      := "while" "(" expression ")" block ";"?
+forStmt        := "for" "(" forClause? ";" expression? ";" forClause? ")" block ";"?
+forClause      := varDecl' | assignment' | compoundAssign'   # same forms, no trailing ";"
 exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool"
@@ -358,10 +420,10 @@ time, not parse time) if it's the file actually being compiled/run.
 
 ## Not yet implemented
 
-- Arithmetic as a general infix expression (only reachable via compound assignment right now)
+- Arithmetic as a general infix expression (only reachable via compound assignment right now — this also means a `for` loop's `<update>` clause can't be written as `i = i + 1`, only `i += 1`)
 - Operator grouping with parentheses (e.g. `(a || b) && c`)
 - Short-circuit evaluation of `&&`/`||`
-- `while` / `for` loops
+- `break` / `continue` inside loops
 - Functions
 - Block comments (`#` only comments to end of line)
 - `.parse`-equivalent for `bool` (a `str` can't currently be converted to `bool`)

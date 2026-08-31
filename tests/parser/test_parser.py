@@ -12,6 +12,7 @@ from nodes.nodes import (
     CallStatement,
     ExpressionStatement,
     FloatLiteral,
+    ForStatement,
     Identifier,
     IfStatement,
     InputCall,
@@ -21,6 +22,7 @@ from nodes.nodes import (
     StringLiteral,
     UnaryOp,
     VarDecl,
+    WhileStatement,
 )
 from lexer.lexer import Lexer
 from parser.parser import Parser
@@ -443,3 +445,75 @@ def test_file_with_no_main_parses_when_it_has_other_classes():
 
     assert "main" not in program.classes
     assert "util" in program.classes
+
+
+def test_parses_while_statement():
+    statements = parse_program("var i: int = 0;\nwhile (i < 3) {\ni += 1;\n}")
+
+    while_stmt = statements[1]
+    assert isinstance(while_stmt, WhileStatement)
+    assert isinstance(while_stmt.condition, BinaryOp)
+    assert while_stmt.condition.operator == "<"
+    assert len(while_stmt.body) == 1
+
+
+def test_parses_while_with_trailing_semicolon():
+    statements = parse_program("while (true) {};")
+    assert isinstance(statements[0], WhileStatement)
+
+
+def test_parses_empty_while_body():
+    statements = parse_program("while (false) {}")
+    while_stmt = statements[0]
+    assert while_stmt.body == []
+
+
+def test_parses_for_statement_with_all_clauses():
+    statements = parse_program("for (var j: int = 0; j < 3; j += 1) {\nprint(j);\n}")
+
+    for_stmt = statements[0]
+    assert isinstance(for_stmt, ForStatement)
+    assert isinstance(for_stmt.init, VarDecl)
+    assert for_stmt.init.name == "j"
+    assert isinstance(for_stmt.condition, BinaryOp)
+    assert for_stmt.condition.operator == "<"
+    assert isinstance(for_stmt.update, Assignment)
+    assert for_stmt.update.name == "j"
+    assert len(for_stmt.body) == 1
+
+
+def test_parses_for_with_assignment_init_and_update():
+    statements = parse_program(
+        "var j: int = 0;\nfor (j = 0; j < 3; j += 1) {\nprint(j);\n}"
+    )
+    for_stmt = statements[1]
+    assert isinstance(for_stmt.init, Assignment)
+    assert isinstance(for_stmt.update, Assignment)
+
+
+def test_parses_for_with_omitted_clauses():
+    statements = parse_program("var i: int = 0;\nfor (; i < 3;) {\ni += 1;\n}")
+
+    for_stmt = statements[1]
+    assert for_stmt.init is None
+    assert for_stmt.condition is not None
+    assert for_stmt.update is None
+
+
+def test_parses_for_with_all_clauses_omitted():
+    statements = parse_program("for (;;) {}")
+
+    for_stmt = statements[0]
+    assert for_stmt.init is None
+    assert for_stmt.condition is None
+    assert for_stmt.update is None
+
+
+def test_parses_for_with_trailing_semicolon():
+    statements = parse_program("for (;;) {};")
+    assert isinstance(statements[0], ForStatement)
+
+
+def test_rejects_for_with_invalid_init_clause():
+    with pytest.raises(ParseError):
+        parse_program('for (print("x"); true;) {}')

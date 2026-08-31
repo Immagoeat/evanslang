@@ -6,6 +6,7 @@ from nodes.nodes import (
     ClassDecl,
     ExpressionStatement,
     FloatLiteral,
+    ForStatement,
     Identifier,
     IfStatement,
     InputCall,
@@ -17,6 +18,7 @@ from nodes.nodes import (
     StringLiteral,
     UnaryOp,
     VarDecl,
+    WhileStatement,
 )
 from lexer.token import Token, TokenType
 from utils.errors import ParseError
@@ -157,6 +159,10 @@ class Parser:
             return self._parse_var_decl()
         if token.type == TokenType.IDENTIFIER and token.value == "if":
             return self._parse_if_statement()
+        if token.type == TokenType.IDENTIFIER and token.value == "while":
+            return self._parse_while_statement()
+        if token.type == TokenType.IDENTIFIER and token.value == "for":
+            return self._parse_for_statement()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
             return self._parse_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
@@ -202,7 +208,7 @@ class Parser:
         self._expect(TokenType.SEMICOLON)
         return PrintStatement(argument)
 
-    def _parse_var_decl(self) -> VarDecl:
+    def _parse_var_decl(self, consume_semicolon: bool = True) -> VarDecl:
         self._expect(TokenType.IDENTIFIER, "var")
         name_token = self._expect(TokenType.IDENTIFIER)
         self._expect(TokenType.COLON)
@@ -217,12 +223,16 @@ class Parser:
         self.declared_types[name_token.value] = type_token.value
 
         if self._peek().type == TokenType.SEMICOLON:
-            self._advance()
+            if consume_semicolon:
+                self._advance()
+            return VarDecl(name_token.value, type_token.value, None)
+        if not consume_semicolon and self._peek().type == TokenType.RPAREN:
             return VarDecl(name_token.value, type_token.value, None)
 
         self._expect(TokenType.EQUALS)
         value = self._parse_expression()
-        self._expect(TokenType.SEMICOLON)
+        if consume_semicolon:
+            self._expect(TokenType.SEMICOLON)
         self._check_type(name_token, type_token.value, value)
 
         return VarDecl(name_token.value, type_token.value, value)
@@ -256,6 +266,56 @@ class Parser:
 
         return IfStatement(condition, body, elif_branches, else_body)
 
+    def _parse_while_statement(self) -> WhileStatement:
+        self._expect(TokenType.IDENTIFIER, "while")
+        self._expect(TokenType.LPAREN)
+        condition = self._parse_expression()
+        self._expect(TokenType.RPAREN)
+        body = self._parse_block()
+        self._skip_optional_semicolon()
+        return WhileStatement(condition, body)
+
+    def _parse_for_statement(self) -> ForStatement:
+        self._expect(TokenType.IDENTIFIER, "for")
+        self._expect(TokenType.LPAREN)
+
+        init = None
+        if self._peek().type != TokenType.SEMICOLON:
+            init = self._parse_for_clause_statement()
+        self._expect(TokenType.SEMICOLON)
+
+        condition = None
+        if self._peek().type != TokenType.SEMICOLON:
+            condition = self._parse_expression()
+        self._expect(TokenType.SEMICOLON)
+
+        update = None
+        if self._peek().type != TokenType.RPAREN:
+            update = self._parse_for_clause_statement()
+        self._expect(TokenType.RPAREN)
+
+        body = self._parse_block()
+        self._skip_optional_semicolon()
+        return ForStatement(init, condition, update, body)
+
+    def _parse_for_clause_statement(self):
+        # The init/update clauses of a for-header are statements without
+        # their own trailing ';' (the header's own ';'/')' delimits them
+        # instead), so these reuse the normal statement parsers with
+        # consume_semicolon=False.
+        token = self._peek()
+        if token.type == TokenType.IDENTIFIER and token.value == "var":
+            return self._parse_var_decl(consume_semicolon=False)
+        if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
+            return self._parse_assignment(consume_semicolon=False)
+        if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
+            return self._parse_compound_assignment(consume_semicolon=False)
+        raise ParseError(
+            f"Expected a variable declaration or assignment in for(...) but got {token.value!r}",
+            token.line,
+            token.column,
+        )
+
     def _parse_block(self) -> list:
         self._expect(TokenType.LBRACE)
         statements = []
@@ -274,11 +334,12 @@ class Parser:
         if self._peek().type == TokenType.SEMICOLON:
             self._advance()
 
-    def _parse_assignment(self) -> Assignment:
+    def _parse_assignment(self, consume_semicolon: bool = True) -> Assignment:
         name_token = self._expect(TokenType.IDENTIFIER)
         self._expect(TokenType.EQUALS)
         value = self._parse_expression()
-        self._expect(TokenType.SEMICOLON)
+        if consume_semicolon:
+            self._expect(TokenType.SEMICOLON)
 
         declared_type = self.declared_types.get(name_token.value)
         if declared_type is None:
@@ -291,12 +352,13 @@ class Parser:
 
         return Assignment(name_token.value, value)
 
-    def _parse_compound_assignment(self) -> Assignment:
+    def _parse_compound_assignment(self, consume_semicolon: bool = True) -> Assignment:
         name_token = self._expect(TokenType.IDENTIFIER)
         op_token = self._advance()
         operator = COMPOUND_OPERATORS[op_token.type]
         rhs = self._parse_expression()
-        self._expect(TokenType.SEMICOLON)
+        if consume_semicolon:
+            self._expect(TokenType.SEMICOLON)
 
         declared_type = self.declared_types.get(name_token.value)
         if declared_type is None:
