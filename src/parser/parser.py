@@ -383,6 +383,7 @@ class Parser:
             )
 
         literal_types = {"int": IntLiteral, "float": FloatLiteral}
+        arithmetic_ops = ("+", "-", "*", "/")
         if isinstance(rhs, literal_types[declared_type]):
             pass
         elif isinstance(rhs, Identifier):
@@ -393,6 +394,10 @@ class Parser:
                     name_token.line,
                     name_token.column,
                 )
+        elif isinstance(rhs, BinaryOp) and rhs.operator in arithmetic_ops:
+            pass  # runtime-checked, same as general arithmetic elsewhere
+        elif isinstance(rhs, UnaryOp) and rhs.operator == "-":
+            pass  # runtime-checked
         else:
             raise ParseError(
                 f"Cannot use {op_token.value!r} with a non-{declared_type} value",
@@ -408,6 +413,57 @@ class Parser:
             if value.target_type != type_name:
                 raise ParseError(
                     f"Cannot assign .parse({value.target_type}) to "
+                    f"{type_name!r} variable {name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+            return
+        # Arithmetic expressions (+, -, *, /) and unary minus aren't
+        # statically type-checked - the parser doesn't trace through
+        # arbitrary expression trees to infer a type, since evanslang
+        # variables can hold either int or float and both support every
+        # arithmetic operator. Assigning the result of arithmetic to a
+        # non-numeric ('str'/'bool') variable is still rejected here;
+        # whether the actual runtime values behave (e.g. int vs float
+        # mismatches) is checked when the expression actually runs,
+        # matching how comparisons (==, <, etc) are already runtime-only.
+        if isinstance(value, BinaryOp) and value.operator in ("+", "-", "*", "/"):
+            if type_name not in ("int", "float"):
+                raise ParseError(
+                    f"Cannot assign an arithmetic expression to "
+                    f"{type_name!r} variable {name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+            return
+        if isinstance(value, UnaryOp) and value.operator == "-":
+            if type_name not in ("int", "float"):
+                raise ParseError(
+                    f"Cannot assign an arithmetic expression to "
+                    f"{type_name!r} variable {name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+            return
+        # Comparisons and boolean combinators always produce a bool at
+        # runtime regardless of their operands' types, so (like arithmetic
+        # above) these are only checked for the *target* being 'bool' -
+        # operand compatibility is a runtime concern (matches how bare
+        # comparisons outside of var decls have always behaved).
+        boolean_ops = ("==", "!=", "<", "<=", ">", ">=", "&&", "||")
+        if isinstance(value, BinaryOp) and value.operator in boolean_ops:
+            if type_name != "bool":
+                raise ParseError(
+                    f"Cannot assign a boolean expression to "
+                    f"{type_name!r} variable {name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+            return
+        if isinstance(value, UnaryOp) and value.operator == "!":
+            if type_name != "bool":
+                raise ParseError(
+                    f"Cannot assign a boolean expression to "
                     f"{type_name!r} variable {name_token.value!r}",
                     name_token.line,
                     name_token.column,
@@ -465,16 +521,46 @@ class Parser:
         return self._parse_comparison()
 
     def _parse_comparison(self):
-        left = self._parse_primary()
+        left = self._parse_additive()
         if self._peek().type in COMPARISON_OPERATORS:
             operator = COMPARISON_OPERATORS[self._peek().type]
             self._advance()
-            right = self._parse_primary()
+            right = self._parse_additive()
             return BinaryOp(operator, left, right)
         return left
 
+    def _parse_additive(self):
+        left = self._parse_multiplicative()
+        while self._peek().type in (TokenType.PLUS, TokenType.MINUS):
+            operator = "+" if self._peek().type == TokenType.PLUS else "-"
+            self._advance()
+            right = self._parse_multiplicative()
+            left = BinaryOp(operator, left, right)
+        return left
+
+    def _parse_multiplicative(self):
+        left = self._parse_unary_minus()
+        while self._peek().type in (TokenType.STAR, TokenType.SLASH):
+            operator = "*" if self._peek().type == TokenType.STAR else "/"
+            self._advance()
+            right = self._parse_unary_minus()
+            left = BinaryOp(operator, left, right)
+        return left
+
+    def _parse_unary_minus(self):
+        if self._peek().type == TokenType.MINUS:
+            self._advance()
+            operand = self._parse_unary_minus()
+            return UnaryOp("-", operand)
+        return self._parse_primary()
+
     def _parse_primary(self):
         token = self._peek()
+        if token.type == TokenType.LPAREN:
+            self._advance()
+            expression = self._parse_expression()
+            self._expect(TokenType.RPAREN)
+            return expression
         if token.type == TokenType.STRING:
             self._advance()
             return StringLiteral(token.value)

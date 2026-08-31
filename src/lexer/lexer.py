@@ -122,6 +122,22 @@ class Lexer:
             self._advance()
             return Token(TokenType.SLASH_EQUALS, "/=", line, column)
 
+        if char == "+":
+            self._advance()
+            return Token(TokenType.PLUS, "+", line, column)
+
+        if char == "-":
+            self._advance()
+            return Token(TokenType.MINUS, "-", line, column)
+
+        if char == "*":
+            self._advance()
+            return Token(TokenType.STAR, "*", line, column)
+
+        if char == "/":
+            self._advance()
+            return Token(TokenType.SLASH, "/", line, column)
+
         if char == '"':
             return self._read_string()
 

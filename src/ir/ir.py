@@ -17,6 +17,7 @@ class OpCode(Enum):
     AND = auto()
     OR = auto()
     NOT = auto()
+    NEG = auto()
     ADD = auto()
     SUB = auto()
     MUL = auto()

@@ -21,6 +21,16 @@ def build_and_run(source: str) -> None:
         VM().run(ir_program)
 
 
+def build_run_capture(source: str) -> list[str]:
+    import contextlib
+    import io
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        build_and_run(source)
+    return [line for line in buf.getvalue().splitlines() if line]
+
+
 def test_calling_the_same_class_twice_does_not_duplicate_code():
     # Regression check for CALL/RETURN: calling a class multiple times
     # must reuse the same compiled block, not re-inline it.
@@ -68,3 +78,46 @@ def test_init_runs_once_before_main():
 
     lines = [line for line in buf.getvalue().splitlines() if line]
     assert lines == ["init", "main"]
+
+
+def test_arithmetic_respects_multiplicative_precedence():
+    lines = build_run_capture(
+        'class main() {\nprint(2 + 3 * 4);\n}'
+    )
+    assert lines == ["14"]
+
+
+def test_arithmetic_parentheses_override_precedence():
+    lines = build_run_capture(
+        'class main() {\nprint((2 + 3) * 4);\n}'
+    )
+    assert lines == ["20"]
+
+
+def test_unary_minus_and_subtraction_combine():
+    lines = build_run_capture(
+        'class main() {\nprint(10 - -5);\n}'
+    )
+    assert lines == ["15"]
+
+
+def test_arithmetic_result_usable_in_condition():
+    lines = build_run_capture(
+        'class main() {\nif (2 * 3 > 5) {\nprint("yes");\n}\n}'
+    )
+    assert lines == ["yes"]
+
+
+def test_arithmetic_type_mismatch_raises_clean_error():
+    with pytest.raises(EvansLangError):
+        build_and_run(
+            'class main() {\nvar a: str = "hi";\nvar b: int = 5;\n'
+            'print(a + b);\n}'
+        )
+
+
+def test_negating_a_bool_raises_clean_error():
+    with pytest.raises(EvansLangError):
+        build_and_run(
+            'class main() {\nvar a: bool = true;\nvar b: int = -a;\n}'
+        )

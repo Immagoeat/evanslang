@@ -72,27 +72,31 @@ class VM:
             elif instruction.opcode == OpCode.NOT:
                 value = self.stack.pop()
                 self.stack.append(not value)
+            elif instruction.opcode == OpCode.NEG:
+                value = self.stack.pop()
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    raise EvansLangError(
+                        f"Cannot negate a {type(value).__name__}"
+                    )
+                self.stack.append(-value)
             elif instruction.opcode == OpCode.ADD:
                 right = self.stack.pop()
                 left = self.stack.pop()
-                self.stack.append(left + right)
+                self.stack.append(self._arithmetic(left, right, "+"))
             elif instruction.opcode == OpCode.SUB:
                 right = self.stack.pop()
                 left = self.stack.pop()
-                self.stack.append(left - right)
+                self.stack.append(self._arithmetic(left, right, "-"))
             elif instruction.opcode == OpCode.MUL:
                 right = self.stack.pop()
                 left = self.stack.pop()
-                self.stack.append(left * right)
+                self.stack.append(self._arithmetic(left, right, "*"))
             elif instruction.opcode == OpCode.DIV:
                 right = self.stack.pop()
                 left = self.stack.pop()
                 if right == 0:
                     raise EvansLangError("Division by zero")
-                if isinstance(left, int) and isinstance(right, int):
-                    self.stack.append(left // right)
-                else:
-                    self.stack.append(left / right)
+                self.stack.append(self._arithmetic(left, right, "/"))
             elif instruction.opcode == OpCode.JUMP_IF_FALSE:
                 condition = self.stack.pop()
                 if not condition:
@@ -133,4 +137,20 @@ class VM:
         except TypeError:
             raise EvansLangError(
                 f"Cannot compare {type(left).__name__} with {type(right).__name__} using {operator!r}"
+            )
+
+    def _arithmetic(self, left, right, operator: str):
+        try:
+            if operator == "+":
+                return left + right
+            if operator == "-":
+                return left - right
+            if operator == "*":
+                return left * right
+            if isinstance(left, int) and isinstance(right, int):
+                return left // right
+            return left / right
+        except TypeError:
+            raise EvansLangError(
+                f"Cannot apply {operator!r} to {type(left).__name__} and {type(right).__name__}"
             )

@@ -190,11 +190,13 @@ bob = "Hi";
 ```
 
 Shorthand for `<NAME> = <NAME> <op> <expression>;`. Only valid on `int`
-and `float` variables; `<expression>` must be a literal or variable of that
-*same* type — `int` and `float` never mix, even between two variables
-(both are compile-time (parse) errors otherwise). `/=` on `int` uses
-integer (floor) division; on `float` it uses real division. Dividing by
-zero is a runtime error either way.
+and `float` variables. `<expression>` may be a literal, a variable, or an
+arithmetic expression; a literal or variable operand must match `<NAME>`'s
+declared type exactly — `int` and `float` never mix, even between two
+variables (a compile-time (parse) error otherwise). An arithmetic
+`<expression>` is runtime-checked instead, same as general arithmetic
+elsewhere. `/=` on `int` uses integer (floor) division; on `float` it uses
+real division. Dividing by zero is a runtime error either way.
 
 ```
 var bob: int = 10;
@@ -294,6 +296,11 @@ for (var j: int = 0; j < 3; j += 1) {
     print(j);
 }
 
+# the update clause can also use a plain assignment with arithmetic
+for (var k: int = 0; k < 3; k = k + 1) {
+    print(k);
+}
+
 # any clause can be omitted
 var i: int = 0;
 for (; i < 3;) {
@@ -341,14 +348,25 @@ Currently supported expressions:
 - `input("<prompt>")` — see below
 - Comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
 - Boolean operators: `&&` (and), `||` (or), `!` (not, prefix/unary)
-- Arithmetic (`+`, `-`, `*`, `/`) — currently only reachable through
-  compound assignment (`+=`, `-=`, `*=`, `/=`), not as a general infix
-  expression inside `print(...)` or elsewhere
+- Arithmetic: `+`, `-`, `*`, `/` (infix, usable anywhere an expression is
+  valid — inside `print(...)`, `var`/assignment initializers, `if`/`while`/
+  `for` conditions, compound assignment, etc.) and unary `-` (negation,
+  prefix, e.g. `-x`)
+- Parenthesized expressions: `(<expression>)`, to override precedence
 
 Precedence, loosest to tightest: `||`, then `&&`, then `!`, then the
-comparison operators, then primaries (literals/identifiers/`input`). There
-is no operator grouping with parentheses yet — `!` applies to the entire
-comparison that follows it (`!a == b` means `!(a == b)`, not `(!a) == b`).
+comparison operators, then `+`/`-` (addition/subtraction), then `*`/`/`
+(multiplication/division), then unary `-`, then primaries
+(literals/identifiers/`input`/parenthesized expressions). `!` applies to
+the entire comparison that follows it (`!a == b` means `!(a == b)`, not
+`(!a) == b`). Parentheses group any expression and can be nested, e.g.
+`(2 + 3) * 4` evaluates to `20`.
+
+`+`, `-`, `*`, `/` are not statically type-checked against the variable
+they're assigned to beyond requiring an `int` or `float` target — whether
+the operands themselves are compatible (e.g. mixing `int` and `str`) is
+checked at runtime, raising a clean runtime error, the same as comparisons.
+Unary `-` on a non-numeric value (e.g. a `bool`) is also a runtime error.
 
 `==`/`!=` never type-check their operands — comparing an `int` to a `str`
 is allowed and simply evaluates to `false`/`true` at runtime. `<`, `<=`,
@@ -429,7 +447,7 @@ callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
 assignment     := IDENTIFIER "=" expression ";"
-compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") (INT | FLOAT | IDENTIFIER) ";"
+compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") expression ";"
 ifStmt         := "if" "(" expression ")" block ";"?
                   ("elseif" "(" expression ")" block ";"?)*
                   ("else" block ";"?)?
@@ -443,8 +461,11 @@ expression     := or
 or             := and ("||" and)*
 and            := not ("&&" not)*
 not            := "!" not | comparison
-comparison     := primary (("==" | "!=" | "<" | "<=" | ">" | ">=") primary)?
-primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER parseCall? | inputCall
+comparison     := additive (("==" | "!=" | "<" | "<=" | ">" | ">=") additive)?
+additive       := multiplicative (("+" | "-") multiplicative)*
+multiplicative := unaryMinus (("*" | "/") unaryMinus)*
+unaryMinus     := "-" unaryMinus | primary
+primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER parseCall? | inputCall | "(" expression ")"
 parseCall      := "." "parse" "(" type ")"
 inputCall      := "input" "(" STRING ")"
 ```
@@ -455,11 +476,10 @@ time, not parse time) if it's the file actually being compiled/run.
 
 ## Not yet implemented
 
-- Arithmetic as a general infix expression (only reachable via compound assignment right now — this also means a `for` loop's `<update>` clause can't be written as `i = i + 1`, only `i += 1`)
-- Operator grouping with parentheses (e.g. `(a || b) && c`)
 - Short-circuit evaluation of `&&`/`||`
 - `break` / `continue` inside loops
 - Functions
 - Block comments (`#` only comments to end of line)
+- String concatenation with `+`
 - Real OOP: fields, methods (beyond a single callable body), `new`/instantiation, `this`, inheritance, parameters, return values — classes are currently just named, callable blocks of statements
 - Quoted/path-style `@mentions` filenames (e.g. subdirectories) — the filename is a bare dotted identifier sequence, so it must look like a valid identifier chain (`utils.el`, not `"../lib/utils.el"`)

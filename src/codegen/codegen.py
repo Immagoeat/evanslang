@@ -39,6 +39,7 @@ BINARY_OPCODES = {
 
 UNARY_OPCODES = {
     "!": OpCode.NOT,
+    "-": OpCode.NEG,
 }
 
 

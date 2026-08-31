@@ -149,21 +149,31 @@ class Interpreter:
                     raise EvansLangError(
                         f"Cannot compare {type(left).__name__} with {type(right).__name__} using {node.operator!r}"
                     )
-            if node.operator == "+":
-                return left + right
-            if node.operator == "-":
-                return left - right
-            if node.operator == "*":
-                return left * right
-            if node.operator == "/":
-                if right == 0:
+            if node.operator in ("+", "-", "*", "/"):
+                if node.operator == "/" and right == 0:
                     raise EvansLangError("Division by zero")
-                if isinstance(left, int) and isinstance(right, int):
-                    return left // right
-                return left / right
+                try:
+                    if node.operator == "+":
+                        return left + right
+                    if node.operator == "-":
+                        return left - right
+                    if node.operator == "*":
+                        return left * right
+                    if isinstance(left, int) and isinstance(right, int):
+                        return left // right
+                    return left / right
+                except TypeError:
+                    raise EvansLangError(
+                        f"Cannot apply {node.operator!r} to {type(left).__name__} and {type(right).__name__}"
+                    )
             raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
         if isinstance(node, UnaryOp):
             if node.operator == "!":
                 return not self._evaluate(node.operand)
+            if node.operator == "-":
+                value = self._evaluate(node.operand)
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    raise EvansLangError(f"Cannot negate a {type(value).__name__}")
+                return -value
             raise NotImplementedError(f"Unsupported operator: {node.operator!r}")
         raise NotImplementedError(f"Cannot evaluate node: {node!r}")
