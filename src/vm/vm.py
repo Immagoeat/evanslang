@@ -9,15 +9,26 @@ def _display(value):
     return value
 
 
-def _parse_number(text: str):
-    try:
-        return int(text)
-    except ValueError:
-        pass
-    try:
-        return float(text)
-    except ValueError:
-        raise EvansLangError(f"Cannot parse {text!r} as a number")
+def _parse_as(text: str, target_type: str):
+    if target_type == "str":
+        return text
+    if target_type == "int":
+        try:
+            return int(text)
+        except ValueError:
+            raise EvansLangError(f"Cannot parse {text!r} as an int")
+    if target_type == "float":
+        try:
+            return float(text)
+        except ValueError:
+            raise EvansLangError(f"Cannot parse {text!r} as a float")
+    if target_type == "bool":
+        if text == "true":
+            return True
+        if text == "false":
+            return False
+        raise EvansLangError(f"Cannot parse {text!r} as a bool")
+    raise EvansLangError(f"Unknown parse target type {target_type!r}")
 
 
 class VM:
@@ -45,7 +56,7 @@ class VM:
                 prompt = self.stack.pop()
                 self.stack.append(input(prompt))
             elif instruction.opcode == OpCode.PARSE:
-                self.stack.append(_parse_number(self.stack.pop()))
+                self.stack.append(_parse_as(self.stack.pop(), instruction.operand))
             elif instruction.opcode == OpCode.POP:
                 self.stack.pop()
             elif instruction.opcode == OpCode.PRINT:

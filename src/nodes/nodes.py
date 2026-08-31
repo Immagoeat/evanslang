@@ -70,11 +70,12 @@ class InputCall(Node):
 
 
 class ParseCall(Node):
-    def __init__(self, target: Node):
+    def __init__(self, target: Node, target_type: str):
         self.target = target
+        self.target_type = target_type
 
     def __repr__(self):
-        return f"ParseCall({self.target!r})"
+        return f"ParseCall({self.target!r}, {self.target_type!r})"
 
 
 class PrintStatement(Node):

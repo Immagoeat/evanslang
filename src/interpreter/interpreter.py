@@ -27,15 +27,26 @@ def _display(value):
     return value
 
 
-def _parse_number(text: str):
-    try:
-        return int(text)
-    except ValueError:
-        pass
-    try:
-        return float(text)
-    except ValueError:
-        raise EvansLangError(f"Cannot parse {text!r} as a number")
+def _parse_as(text: str, target_type: str):
+    if target_type == "str":
+        return text
+    if target_type == "int":
+        try:
+            return int(text)
+        except ValueError:
+            raise EvansLangError(f"Cannot parse {text!r} as an int")
+    if target_type == "float":
+        try:
+            return float(text)
+        except ValueError:
+            raise EvansLangError(f"Cannot parse {text!r} as a float")
+    if target_type == "bool":
+        if text == "true":
+            return True
+        if text == "false":
+            return False
+        raise EvansLangError(f"Cannot parse {text!r} as a bool")
+    raise EvansLangError(f"Unknown parse target type {target_type!r}")
 
 
 class Interpreter:
@@ -118,7 +129,7 @@ class Interpreter:
         if isinstance(node, InputCall):
             return input(self._evaluate(node.prompt))
         if isinstance(node, ParseCall):
-            return _parse_number(self._evaluate(node.target))
+            return _parse_as(self._evaluate(node.target), node.target_type)
         if isinstance(node, BinaryOp):
             left = self._evaluate(node.left)
             right = self._evaluate(node.right)

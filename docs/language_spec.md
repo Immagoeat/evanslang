@@ -356,30 +356,37 @@ print(bob);
 ### .parse
 
 ```
-<NAME>.parse
+<NAME>.parse(<type>)
 ```
 
-Converts a `str` variable's current value to a number, auto-detecting
-`int` vs. `float` from the text at runtime (`"42"` → `int`, `"3.14"` →
-`float`). `<NAME>` must be a previously-declared `str` variable — calling
-`.parse` on a non-`str` or undeclared variable is a parse-time error. Since
-the resulting type depends on the string's *contents* (not knowable until
-the program runs), `bob.parse` is accepted as the initializer/assigned
-value for both `int` and `float` variables at parse time; if the runtime
-type doesn't actually match what gets stored, that mismatch isn't caught.
-If the string isn't a valid number at all, `.parse` raises a runtime
-error. `.parse` can be used as an expression (assigned or passed to
-`print`) or as a bare statement (`bob.parse;`), in which case the result
-is simply discarded.
+Converts a `str` variable's current value to `<type>`, one of `int`,
+`float`, `bool`, or `str` (a no-op identity conversion). `<NAME>` must be
+a previously-declared `str` variable — calling `.parse(...)` on a non-`str`
+or undeclared variable is a parse-time error, as is naming an unknown
+type. `<type>` must also match whatever the result is assigned or
+initialized into — `var f: float = bob.parse(int);` is a parse-time error
+because the declared type (`float`) doesn't match the parse target
+(`int`), even though both are numeric.
+
+At runtime, `int`/`float` use normal numeric parsing; `bool` accepts
+exactly the strings `"true"` or `"false"` (case-sensitive, matching the
+literal syntax) and rejects anything else. A string that doesn't match
+`<type>` raises a runtime error. `.parse(...)` can be used as an
+expression (assigned or passed to `print`) or as a bare statement
+(`bob.parse(int);`), in which case the result is simply discarded.
 
 ```
 var bob: str = "42";
-var n: int = bob.parse;
+var n: int = bob.parse(int);
 print(n);
 
 var pi_str: str = "3.14";
-var pi: float = pi_str.parse;
+var pi: float = pi_str.parse(float);
 print(pi);
+
+var flag_str: str = "true";
+var flag: bool = flag_str.parse(bool);
+print(flag);
 ```
 
 ## Grammar (informal)
@@ -402,7 +409,7 @@ ifStmt         := "if" "(" expression ")" block ";"?
 whileStmt      := "while" "(" expression ")" block ";"?
 forStmt        := "for" "(" forClause? ";" expression? ";" forClause? ")" block ";"?
 forClause      := varDecl' | assignment' | compoundAssign'   # same forms, no trailing ";"
-exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse"
+exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool"
 expression     := or
@@ -410,7 +417,8 @@ or             := and ("||" and)*
 and            := not ("&&" not)*
 not            := "!" not | comparison
 comparison     := primary (("==" | "!=" | "<" | "<=" | ">" | ">=") primary)?
-primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER ("." "parse")? | inputCall
+primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER parseCall? | inputCall
+parseCall      := "." "parse" "(" type ")"
 inputCall      := "input" "(" STRING ")"
 ```
 
@@ -426,6 +434,5 @@ time, not parse time) if it's the file actually being compiled/run.
 - `break` / `continue` inside loops
 - Functions
 - Block comments (`#` only comments to end of line)
-- `.parse`-equivalent for `bool` (a `str` can't currently be converted to `bool`)
 - Real OOP: fields, methods (beyond a single callable body), `new`/instantiation, `this`, inheritance, parameters, return values — classes are currently just named, callable blocks of statements
 - Quoted/path-style `@mentions` filenames (e.g. subdirectories) — the filename is a bare dotted identifier sequence, so it must look like a valid identifier chain (`utils.el`, not `"../lib/utils.el"`)

@@ -396,27 +396,28 @@ class Parser:
         return Assignment(name_token.value, value)
 
     def _check_type(self, name_token: Token, type_name: str, value) -> None:
+        if isinstance(value, ParseCall):
+            if value.target_type != type_name:
+                raise ParseError(
+                    f"Cannot assign .parse({value.target_type}) to "
+                    f"{type_name!r} variable {name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+            return
         if type_name == "str" and not isinstance(value, (StringLiteral, InputCall)):
             raise ParseError(
                 f"Cannot assign non-string value to 'str' variable {name_token.value!r}",
                 name_token.line,
                 name_token.column,
             )
-        if (
-            type_name == "int"
-            and not isinstance(value, IntLiteral)
-            and not isinstance(value, ParseCall)
-        ):
+        if type_name == "int" and not isinstance(value, IntLiteral):
             raise ParseError(
                 f"Cannot assign non-int value to 'int' variable {name_token.value!r}",
                 name_token.line,
                 name_token.column,
             )
-        if (
-            type_name == "float"
-            and not isinstance(value, FloatLiteral)
-            and not isinstance(value, ParseCall)
-        ):
+        if type_name == "float" and not isinstance(value, FloatLiteral):
             raise ParseError(
                 f"Cannot assign non-float value to 'float' variable {name_token.value!r}",
                 name_token.line,
@@ -489,14 +490,23 @@ class Parser:
             if self._peek().type == TokenType.DOT:
                 self._advance()
                 self._expect(TokenType.IDENTIFIER, "parse")
-                target_type = self.declared_types.get(target.name)
-                if target_type != "str":
+                source_type = self.declared_types.get(target.name)
+                if source_type != "str":
                     raise ParseError(
-                        f"Cannot call .parse on {target_type or 'undeclared'} variable {target.name!r} (expected 'str')",
+                        f"Cannot call .parse on {source_type or 'undeclared'} variable {target.name!r} (expected 'str')",
                         token.line,
                         token.column,
                     )
-                return ParseCall(target)
+                self._expect(TokenType.LPAREN)
+                type_token = self._expect(TokenType.IDENTIFIER)
+                if type_token.value not in VALID_TYPES:
+                    raise ParseError(
+                        f"Unknown type {type_token.value!r} in .parse(...)",
+                        type_token.line,
+                        type_token.column,
+                    )
+                self._expect(TokenType.RPAREN)
+                return ParseCall(target, type_token.value)
             return target
         raise ParseError(
             f"Expected an expression but got {token.value!r}",

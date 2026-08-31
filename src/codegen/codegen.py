@@ -234,7 +234,7 @@ class CodeGenerator:
         if isinstance(node, ParseCall):
             return [
                 *self._generate_expression(node.target),
-                Instruction(OpCode.PARSE),
+                Instruction(OpCode.PARSE, node.target_type),
             ]
         if isinstance(node, BinaryOp):
             opcode = BINARY_OPCODES.get(node.operator)

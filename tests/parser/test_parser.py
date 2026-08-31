@@ -300,46 +300,75 @@ def test_rejects_mixing_int_and_float_variables_in_compound_assignment():
         parse_program("var f: float = 1.0;\nvar n: int = 2;\nf += n;")
 
 
-def test_parses_dot_parse_in_var_decl():
-    statements = parse_program('var bob: str = "42";\nvar n: int = bob.parse;')
+def test_parses_dot_parse_int_in_var_decl():
+    statements = parse_program('var bob: str = "42";\nvar n: int = bob.parse(int);')
 
     decl = statements[1]
     assert isinstance(decl, VarDecl)
     assert decl.type_name == "int"
     assert isinstance(decl.value, ParseCall)
+    assert decl.value.target_type == "int"
     assert isinstance(decl.value.target, Identifier)
     assert decl.value.target.name == "bob"
 
 
-def test_parses_dot_parse_for_float_target():
-    statements = parse_program('var bob: str = "3.14";\nvar f: float = bob.parse;')
+def test_parses_dot_parse_float_target():
+    statements = parse_program('var bob: str = "3.14";\nvar f: float = bob.parse(float);')
 
     decl = statements[1]
     assert isinstance(decl.value, ParseCall)
+    assert decl.value.target_type == "float"
+
+
+def test_parses_dot_parse_bool_target():
+    statements = parse_program('var bob: str = "true";\nvar b: bool = bob.parse(bool);')
+
+    decl = statements[1]
+    assert isinstance(decl.value, ParseCall)
+    assert decl.value.target_type == "bool"
+
+
+def test_parses_dot_parse_str_target():
+    statements = parse_program('var bob: str = "hi";\nvar copy: str = bob.parse(str);')
+
+    decl = statements[1]
+    assert isinstance(decl.value, ParseCall)
+    assert decl.value.target_type == "str"
 
 
 def test_parses_bare_dot_parse_as_expression_statement():
-    statements = parse_program('var bob: str = "42";\nbob.parse;')
+    statements = parse_program('var bob: str = "42";\nbob.parse(int);')
 
     stmt = statements[1]
     assert isinstance(stmt, ExpressionStatement)
     assert isinstance(stmt.expression, ParseCall)
     assert stmt.expression.target.name == "bob"
+    assert stmt.expression.target_type == "int"
 
 
 def test_rejects_dot_parse_on_non_str_variable():
     with pytest.raises(ParseError):
-        parse_program("var n: int = 5;\nvar m: int = n.parse;")
+        parse_program("var n: int = 5;\nvar m: int = n.parse(int);")
 
 
 def test_rejects_dot_parse_on_undeclared_variable():
     with pytest.raises(ParseError):
-        parse_program("var n: int = x.parse;")
+        parse_program("var n: int = x.parse(int);")
 
 
-def test_rejects_dot_parse_assigned_to_bool():
+def test_rejects_dot_parse_with_unknown_type():
     with pytest.raises(ParseError):
-        parse_program('var s: str = "true";\nvar b: bool = s.parse;')
+        parse_program('var s: str = "42";\nvar n: int = s.parse(banana);')
+
+
+def test_rejects_dot_parse_target_type_mismatch_with_declared_type():
+    with pytest.raises(ParseError):
+        parse_program('var s: str = "42";\nvar f: float = s.parse(int);')
+
+
+def test_rejects_bare_dot_parse_without_parens():
+    with pytest.raises(ParseError):
+        parse_program('var s: str = "42";\nvar n: int = s.parse;')
 
 
 def test_parses_class_main_wrapper():
