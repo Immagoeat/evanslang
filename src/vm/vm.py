@@ -24,6 +24,7 @@ class VM:
     def __init__(self):
         self.stack = []
         self.variables = {}
+        self.call_stack = []
 
     def run(self, program: IrProgram):
         pc = 0
@@ -112,6 +113,15 @@ class VM:
                     continue
             elif instruction.opcode == OpCode.JUMP:
                 pc += instruction.operand
+                continue
+            elif instruction.opcode == OpCode.CALL:
+                self.call_stack.append(pc + 1)
+                pc = instruction.operand
+                continue
+            elif instruction.opcode == OpCode.RETURN:
+                if not self.call_stack:
+                    raise EvansLangError("Return with no active call")
+                pc = self.call_stack.pop()
                 continue
             elif instruction.opcode == OpCode.HALT:
                 return

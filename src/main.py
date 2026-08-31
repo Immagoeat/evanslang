@@ -6,8 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from codegen.codegen import CodeGenerator
-from lexer.lexer import Lexer
-from parser.parser import Parser
+from linker.linker import link
 from utils.errors import EvansLangError
 from vm import bytecode_file
 from vm.vm import VM
@@ -50,10 +49,8 @@ def build(source_path: Path, output_path: Path):
     if output_path.suffix != BYTECODE_EXTENSION:
         output_path = output_path.with_name(output_path.name + BYTECODE_EXTENSION)
 
-    source = source_path.read_text()
-    tokens = Lexer(source).tokenize()
-    program = Parser(tokens).parse()
-    ir_program = CodeGenerator().generate(program)
+    resolved = link(source_path)
+    ir_program = CodeGenerator().generate(resolved)
     bytecode_file.write(output_path, ir_program)
     return output_path
 

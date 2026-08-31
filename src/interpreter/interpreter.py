@@ -2,6 +2,7 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    CallStatement,
     ExpressionStatement,
     FloatLiteral,
     Identifier,
@@ -10,11 +11,11 @@ from nodes.nodes import (
     IntLiteral,
     ParseCall,
     PrintStatement,
-    Program,
     StringLiteral,
     UnaryOp,
     VarDecl,
 )
+from linker.linker import SEPARATOR, ResolvedProgram
 from utils.errors import EvansLangError
 
 
@@ -39,11 +40,23 @@ class Interpreter:
     def __init__(self):
         self.variables = {}
 
-    def run(self, program: Program):
-        for statement in program.statements:
+    def run(self, resolved: ResolvedProgram):
+        self.classes = resolved.classes
+        if "init" in self.classes:
+            self._run_class("init")
+        self._run_class(resolved.entry)
+
+    def _run_class(self, name: str) -> None:
+        for statement in self.classes[name].body:
             self._execute(statement)
 
     def _execute(self, node):
+        if isinstance(node, CallStatement):
+            target = node.name if node.alias is None else f"{node.alias}{SEPARATOR}{node.name}"
+            if target not in self.classes:
+                raise EvansLangError(f"Call to undefined class {target!r}")
+            self._run_class(target)
+            return
         if isinstance(node, PrintStatement):
             print(_display(self._evaluate(node.argument)))
             return

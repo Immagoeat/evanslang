@@ -55,6 +55,10 @@ class Lexer:
             self._advance()
             return Token(TokenType.DOT, ".", line, column)
 
+        if char == "@":
+            self._advance()
+            return Token(TokenType.AT, "@", line, column)
+
         if char == "=":
             self._advance()
             if self.pos < len(self.source) and self.source[self.pos] == "=":
@@ -102,6 +106,11 @@ class Lexer:
             self._advance()
             self._advance()
             return Token(TokenType.MINUS_EQUALS, "-=", line, column)
+
+        if char == "-" and self._peek_char(1) == ">":
+            self._advance()
+            self._advance()
+            return Token(TokenType.ARROW, "->", line, column)
 
         if char == "*" and self._peek_char(1) == "=":
             self._advance()

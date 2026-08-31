@@ -2,12 +2,15 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    CallStatement,
+    ClassDecl,
     ExpressionStatement,
     FloatLiteral,
     Identifier,
     IfStatement,
     InputCall,
     IntLiteral,
+    Mention,
     ParseCall,
     PrintStatement,
     Program,
@@ -19,6 +22,7 @@ from lexer.token import Token, TokenType
 from utils.errors import ParseError
 
 VALID_TYPES = {"int", "str", "float", "bool"}
+RESERVED_CLASS_NAMES = {"main", "init"}
 
 COMPOUND_OPERATORS = {
     TokenType.PLUS_EQUALS: "+",
@@ -42,24 +46,108 @@ class Parser:
         self.tokens = tokens
         self.pos = 0
         self.declared_types: dict[str, str] = {}
+        self.class_names: set[str] = set()
+        self.mention_aliases: set[str] = set()
 
     def parse(self) -> Program:
-        self._expect(TokenType.IDENTIFIER, "class")
-        self._expect(TokenType.IDENTIFIER, "main")
-        self._expect(TokenType.LPAREN)
-        self._expect(TokenType.RPAREN)
-        statements = self._parse_block()
-        self._skip_optional_semicolon()
+        self._prescan_names()
 
-        if self._peek().type != TokenType.EOF:
-            token = self._peek()
+        mentions: list[Mention] = []
+        while self._peek().type == TokenType.AT:
+            mentions.append(self._parse_mention())
+
+        classes: dict[str, ClassDecl] = {}
+        while self._peek().type != TokenType.EOF:
+            class_decl = self._parse_class()
+            if class_decl.name in classes:
+                raise ParseError(
+                    f"Class {class_decl.name!r} is already defined",
+                    self._peek().line,
+                    self._peek().column,
+                )
+            classes[class_decl.name] = class_decl
+
+        if not classes and not mentions:
             raise ParseError(
-                f"Unexpected token {token.value!r} after 'class main() {{}}'",
-                token.line,
-                token.column,
+                "Empty file: expected at least one 'class' declaration",
+                self._peek().line,
+                self._peek().column,
             )
 
-        return Program(statements)
+        return Program(classes, mentions)
+
+    def _prescan_names(self) -> None:
+        # Walk the top-level tokens once to collect every class name and
+        # mention alias before real parsing begins, so a class body can
+        # call another class declared later in the file (or an @mentions
+        # alias declared anywhere) without a "forward reference" error.
+        i = 0
+        depth = 0
+        while i < len(self.tokens):
+            token = self.tokens[i]
+            if token.type == TokenType.EOF:
+                break
+            if token.type == TokenType.LBRACE:
+                depth += 1
+            elif token.type == TokenType.RBRACE:
+                depth -= 1
+            elif depth == 0 and token.type == TokenType.AT:
+                # @ mentions FILE(.FILE)* -> ALIAS ;
+                j = i + 1
+                if j < len(self.tokens) and self.tokens[j].value == "mentions":
+                    j += 1
+                    while (
+                        j < len(self.tokens)
+                        and self.tokens[j].type != TokenType.ARROW
+                        and self.tokens[j].type != TokenType.EOF
+                    ):
+                        j += 1
+                    if j < len(self.tokens) and self.tokens[j].type == TokenType.ARROW:
+                        j += 1
+                        if j < len(self.tokens) and self.tokens[j].type == TokenType.IDENTIFIER:
+                            self.mention_aliases.add(self.tokens[j].value)
+            elif (
+                depth == 0
+                and token.type == TokenType.IDENTIFIER
+                and token.value == "class"
+            ):
+                if i + 1 < len(self.tokens) and self.tokens[i + 1].type == TokenType.IDENTIFIER:
+                    self.class_names.add(self.tokens[i + 1].value)
+            i += 1
+
+    def _parse_mention(self) -> Mention:
+        self._expect(TokenType.AT)
+        self._expect(TokenType.IDENTIFIER, "mentions")
+        filename = self._parse_filename()
+        self._expect(TokenType.ARROW)
+        alias_token = self._expect(TokenType.IDENTIFIER)
+        self._expect(TokenType.SEMICOLON)
+        self.mention_aliases.add(alias_token.value)
+        return Mention(filename, alias_token.value)
+
+    def _parse_filename(self) -> str:
+        parts = [self._expect(TokenType.IDENTIFIER).value]
+        while self._peek().type == TokenType.DOT:
+            self._advance()
+            parts.append(self._expect(TokenType.IDENTIFIER).value)
+        return ".".join(parts)
+
+    def _parse_class(self) -> ClassDecl:
+        self._expect(TokenType.IDENTIFIER, "class")
+        name_token = self._expect(TokenType.IDENTIFIER)
+        self._expect(TokenType.LPAREN)
+
+        is_ment = False
+        if self._peek().type == TokenType.IDENTIFIER:
+            self._expect(TokenType.IDENTIFIER, "ment")
+            is_ment = True
+
+        self._expect(TokenType.RPAREN)
+        body = self._parse_block()
+        self._skip_optional_semicolon()
+
+        self.class_names.add(name_token.value)
+        return ClassDecl(name_token.value, is_ment, body)
 
     def _parse_statement(self):
         token = self._peek()
@@ -73,11 +161,33 @@ class Parser:
             return self._parse_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
             return self._parse_compound_assignment()
+        if (
+            token.type == TokenType.IDENTIFIER
+            and self._peek(1).type == TokenType.DOT
+            and token.value in self.mention_aliases
+        ):
+            return self._parse_call_statement()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.DOT:
             return self._parse_expression_statement()
+        if (
+            token.type == TokenType.IDENTIFIER
+            and self._peek(1).type == TokenType.SEMICOLON
+            and token.value in self.class_names
+        ):
+            return self._parse_call_statement()
         raise ParseError(
             f"Unexpected token {token.value!r}", token.line, token.column
         )
+
+    def _parse_call_statement(self) -> CallStatement:
+        first_token = self._expect(TokenType.IDENTIFIER)
+        if self._peek().type == TokenType.DOT:
+            self._advance()
+            name_token = self._expect(TokenType.IDENTIFIER)
+            self._expect(TokenType.SEMICOLON)
+            return CallStatement(first_token.value, name_token.value)
+        self._expect(TokenType.SEMICOLON)
+        return CallStatement(None, first_token.value)
 
     def _parse_expression_statement(self) -> ExpressionStatement:
         expression = self._parse_expression()

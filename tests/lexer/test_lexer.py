@@ -179,3 +179,50 @@ def test_tokenizes_dot_parse():
         TokenType.SEMICOLON,
         TokenType.EOF,
     ]
+
+
+def test_tokenizes_mention_directive():
+    tokens = Lexer("@mentions test.el -> test;").tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.AT,
+        TokenType.IDENTIFIER,  # mentions
+        TokenType.IDENTIFIER,  # test
+        TokenType.DOT,
+        TokenType.IDENTIFIER,  # el
+        TokenType.ARROW,
+        TokenType.IDENTIFIER,  # test
+        TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]
+
+
+def test_tokenizes_class_with_ment_modifier():
+    tokens = Lexer("class bob(ment) {}").tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER,  # class
+        TokenType.IDENTIFIER,  # bob
+        TokenType.LPAREN,
+        TokenType.IDENTIFIER,  # ment
+        TokenType.RPAREN,
+        TokenType.LBRACE,
+        TokenType.RBRACE,
+        TokenType.EOF,
+    ]
+
+
+def test_arrow_distinct_from_minus_equals():
+    tokens = Lexer("a -> b; c -= 1;").tokenize()
+    types = [t.type for t in tokens]
+    assert types == [
+        TokenType.IDENTIFIER,
+        TokenType.ARROW,
+        TokenType.IDENTIFIER,
+        TokenType.SEMICOLON,
+        TokenType.IDENTIFIER,
+        TokenType.MINUS_EQUALS,
+        TokenType.INT,
+        TokenType.SEMICOLON,
+        TokenType.EOF,
+    ]

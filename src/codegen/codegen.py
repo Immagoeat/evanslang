@@ -2,6 +2,7 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    CallStatement,
     ExpressionStatement,
     FloatLiteral,
     Identifier,
@@ -14,9 +15,10 @@ from nodes.nodes import (
     UnaryOp,
     VarDecl,
 )
-from nodes.nodes import Program as AstProgram
 from ir.ir import Instruction, OpCode
 from ir.ir import Program as IrProgram
+from linker.linker import SEPARATOR, ResolvedProgram
+from utils.errors import EvansLangError
 
 BINARY_OPCODES = {
     "==": OpCode.EQ,
@@ -39,14 +41,52 @@ UNARY_OPCODES = {
 
 
 class CodeGenerator:
-    def generate(self, program: AstProgram) -> IrProgram:
-        instructions = []
-        for statement in program.statements:
-            instructions.extend(self._generate_statement(statement))
-        instructions.append(Instruction(OpCode.HALT))
+    def generate(self, resolved: ResolvedProgram) -> IrProgram:
+        # Compile every class body independently first (each ending in a
+        # RETURN), then lay them out one after another and patch every CALL
+        # to the absolute start index of its target class's block. The
+        # program starts with a small prologue that calls "init" (if
+        # present) then the entry class, and HALTs when that returns.
+        class_blocks: dict[str, list[Instruction]] = {}
+        for name, class_decl in resolved.classes.items():
+            body_instrs: list[Instruction] = []
+            for statement in class_decl.body:
+                body_instrs.extend(self._generate_statement(statement))
+            body_instrs.append(Instruction(OpCode.RETURN))
+            class_blocks[name] = body_instrs
+
+        prologue: list[Instruction] = []
+        if "init" in class_blocks:
+            prologue.append(Instruction(OpCode.CALL, "init"))
+        prologue.append(Instruction(OpCode.CALL, resolved.entry))
+        prologue.append(Instruction(OpCode.HALT))
+
+        instructions: list[Instruction] = list(prologue)
+        block_starts: dict[str, int] = {}
+        for name, block in class_blocks.items():
+            block_starts[name] = len(instructions)
+            instructions.extend(block)
+
+        for instruction in instructions:
+            if instruction.opcode == OpCode.CALL:
+                target = instruction.operand
+                if target not in block_starts:
+                    if SEPARATOR in target:
+                        alias, name = target.split(SEPARATOR, 1)
+                        raise EvansLangError(
+                            f"{name!r} is not a mentionable class in the file "
+                            f"mentioned as {alias!r} (mark it 'class {name}(ment) {{}}' "
+                            f"to make it reachable, or check the class exists)"
+                        )
+                    raise EvansLangError(f"Call to undefined class {target!r}")
+                instruction.operand = block_starts[target]
+
         return IrProgram(instructions)
 
     def _generate_statement(self, node) -> list[Instruction]:
+        if isinstance(node, CallStatement):
+            target = node.name if node.alias is None else f"{node.alias}{SEPARATOR}{node.name}"
+            return [Instruction(OpCode.CALL, target)]
         if isinstance(node, PrintStatement):
             return [
                 *self._generate_expression(node.argument),

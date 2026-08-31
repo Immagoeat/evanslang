@@ -132,9 +132,42 @@ class IfStatement(Node):
         )
 
 
-class Program(Node):
-    def __init__(self, statements: list[Node]):
-        self.statements = statements
+class ClassDecl(Node):
+    def __init__(self, name: str, is_ment: bool, body: list[Node]):
+        self.name = name
+        self.is_ment = is_ment
+        self.body = body
 
     def __repr__(self):
-        return f"Program({self.statements!r})"
+        return f"ClassDecl({self.name!r}, is_ment={self.is_ment!r}, {self.body!r})"
+
+
+class Mention(Node):
+    def __init__(self, filename: str, alias: str):
+        self.filename = filename
+        self.alias = alias
+
+    def __repr__(self):
+        return f"Mention({self.filename!r}, {self.alias!r})"
+
+
+class CallStatement(Node):
+    def __init__(self, alias: str | None, name: str):
+        self.alias = alias
+        self.name = name
+
+    def __repr__(self):
+        return f"CallStatement(alias={self.alias!r}, name={self.name!r})"
+
+
+class Program(Node):
+    def __init__(
+        self,
+        classes: dict[str, ClassDecl],
+        mentions: list[Mention] | None = None,
+    ):
+        self.classes = classes
+        self.mentions = mentions or []
+
+    def __repr__(self):
+        return f"Program(classes={self.classes!r}, mentions={self.mentions!r})"

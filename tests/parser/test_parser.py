@@ -9,6 +9,7 @@ from nodes.nodes import (
     Assignment,
     BinaryOp,
     BoolLiteral,
+    CallStatement,
     ExpressionStatement,
     FloatLiteral,
     Identifier,
@@ -26,26 +27,28 @@ from parser.parser import Parser
 from utils.errors import ParseError
 
 
-def parse_program(source: str):
+def parse_program(source: str) -> list:
+    """Parse `source` as the body of class main() and return its statement list."""
     wrapped = f"class main() {{\n{source}\n}}"
     tokens = Lexer(wrapped).tokenize()
-    return Parser(tokens).parse()
+    program = Parser(tokens).parse()
+    return program.classes["main"].body
 
 
 def test_parses_print_statement():
-    program = parse_program('print("Hello, World!");')
+    statements = parse_program('print("Hello, World!");')
 
-    assert len(program.statements) == 1
-    statement = program.statements[0]
+    assert len(statements) == 1
+    statement = statements[0]
     assert isinstance(statement, PrintStatement)
     assert isinstance(statement.argument, StringLiteral)
     assert statement.argument.value == "Hello, World!"
 
 
 def test_parses_str_var_decl():
-    program = parse_program('var EXAMPLE: str = "Hello";')
+    statements = parse_program('var EXAMPLE: str = "Hello";')
 
-    statement = program.statements[0]
+    statement = statements[0]
     assert isinstance(statement, VarDecl)
     assert statement.name == "EXAMPLE"
     assert statement.type_name == "str"
@@ -54,9 +57,9 @@ def test_parses_str_var_decl():
 
 
 def test_parses_int_var_decl():
-    program = parse_program("var COUNT: int = 9;")
+    statements = parse_program("var COUNT: int = 9;")
 
-    statement = program.statements[0]
+    statement = statements[0]
     assert isinstance(statement, VarDecl)
     assert statement.name == "COUNT"
     assert statement.type_name == "int"
@@ -70,9 +73,9 @@ def test_rejects_mismatched_var_type():
 
 
 def test_parses_var_decl_without_value():
-    program = parse_program("var bob: str;")
+    statements = parse_program("var bob: str;")
 
-    statement = program.statements[0]
+    statement = statements[0]
     assert isinstance(statement, VarDecl)
     assert statement.name == "bob"
     assert statement.type_name == "str"
@@ -80,9 +83,9 @@ def test_parses_var_decl_without_value():
 
 
 def test_parses_assignment_with_input_call():
-    program = parse_program('var bob: str;\nbob = input("MESSAGE");')
+    statements = parse_program('var bob: str;\nbob = input("MESSAGE");')
 
-    assign = program.statements[1]
+    assign = statements[1]
     assert isinstance(assign, Assignment)
     assert assign.name == "bob"
     assert isinstance(assign.value, InputCall)
@@ -100,9 +103,9 @@ def test_rejects_input_assigned_to_int_variable():
 
 
 def test_parses_if_statement():
-    program = parse_program('var bob: str = "Hi";\nif (bob == "Hi") {\nprint(bob);\n}')
+    statements = parse_program('var bob: str = "Hi";\nif (bob == "Hi") {\nprint(bob);\n}')
 
-    if_stmt = program.statements[1]
+    if_stmt = statements[1]
     assert isinstance(if_stmt, IfStatement)
     assert isinstance(if_stmt.condition, BinaryOp)
     assert if_stmt.condition.operator == "=="
@@ -124,9 +127,9 @@ def test_parses_if_elseif_else_chain():
         "}\n"
         "else {}\n"
     )
-    program = parse_program(source)
+    statements = parse_program(source)
 
-    if_stmt = program.statements[1]
+    if_stmt = statements[1]
     assert isinstance(if_stmt, IfStatement)
     assert len(if_stmt.elif_branches) == 1
     elif_condition, elif_body = if_stmt.elif_branches[0]
@@ -142,26 +145,26 @@ def test_parses_if_with_trailing_semicolons():
         'elseif (bob == "Hello") {};\n'
         "else {};\n"
     )
-    program = parse_program(source)
+    statements = parse_program(source)
 
-    if_stmt = program.statements[1]
+    if_stmt = statements[1]
     assert isinstance(if_stmt, IfStatement)
     assert len(if_stmt.elif_branches) == 1
     assert if_stmt.else_body == []
 
 
 def test_parses_if_without_elseif_or_else():
-    program = parse_program('var bob: str = "Hi";\nif (bob == "Hi") {}\n')
+    statements = parse_program('var bob: str = "Hi";\nif (bob == "Hi") {}\n')
 
-    if_stmt = program.statements[1]
+    if_stmt = statements[1]
     assert if_stmt.elif_branches == []
     assert if_stmt.else_body is None
 
 
 def test_parses_compound_assignment():
-    program = parse_program("var bob: int = 10;\nbob += 3;")
+    statements = parse_program("var bob: int = 10;\nbob += 3;")
 
-    assign = program.statements[1]
+    assign = statements[1]
     assert isinstance(assign, Assignment)
     assert assign.name == "bob"
     assert isinstance(assign.value, BinaryOp)
@@ -174,16 +177,16 @@ def test_parses_compound_assignment():
 
 def test_parses_all_compound_operators():
     source = "var bob: int = 10;\nbob += 3;\nbob -= 3;\nbob *= 3;\nbob /= 3;\n"
-    program = parse_program(source)
+    statements = parse_program(source)
 
-    operators = [stmt.value.operator for stmt in program.statements[1:]]
+    operators = [stmt.value.operator for stmt in statements[1:]]
     assert operators == ["+", "-", "*", "/"]
 
 
 def test_parses_compound_assignment_with_identifier_rhs():
-    program = parse_program("var a: int = 5;\nvar b: int = 3;\na += b;")
+    statements = parse_program("var a: int = 5;\nvar b: int = 3;\na += b;")
 
-    assign = program.statements[2]
+    assign = statements[2]
     assert isinstance(assign.value, BinaryOp)
     assert isinstance(assign.value.right, Identifier)
     assert assign.value.right.name == "b"
@@ -243,9 +246,9 @@ def test_parses_not_on_identifier():
 
 
 def test_parses_float_var_decl():
-    program = parse_program("var pi: float = 3.14;")
+    statements = parse_program("var pi: float = 3.14;")
 
-    statement = program.statements[0]
+    statement = statements[0]
     assert isinstance(statement, VarDecl)
     assert statement.type_name == "float"
     assert isinstance(statement.value, FloatLiteral)
@@ -253,9 +256,9 @@ def test_parses_float_var_decl():
 
 
 def test_parses_bool_var_decl_true_and_false():
-    program = parse_program("var flag: bool = true;\nvar other: bool = false;")
+    statements = parse_program("var flag: bool = true;\nvar other: bool = false;")
 
-    flag_decl, other_decl = program.statements
+    flag_decl, other_decl = statements
     assert isinstance(flag_decl.value, BoolLiteral) and flag_decl.value.value is True
     assert isinstance(other_decl.value, BoolLiteral) and other_decl.value.value is False
 
@@ -276,9 +279,9 @@ def test_rejects_non_bool_for_bool_variable():
 
 
 def test_parses_compound_assignment_on_float_variable():
-    program = parse_program("var f: float = 1.0;\nf += 2.5;")
+    statements = parse_program("var f: float = 1.0;\nf += 2.5;")
 
-    assign = program.statements[1]
+    assign = statements[1]
     assert isinstance(assign, Assignment)
     assert isinstance(assign.value, BinaryOp) and assign.value.operator == "+"
     assert isinstance(assign.value.right, FloatLiteral)
@@ -296,9 +299,9 @@ def test_rejects_mixing_int_and_float_variables_in_compound_assignment():
 
 
 def test_parses_dot_parse_in_var_decl():
-    program = parse_program('var bob: str = "42";\nvar n: int = bob.parse;')
+    statements = parse_program('var bob: str = "42";\nvar n: int = bob.parse;')
 
-    decl = program.statements[1]
+    decl = statements[1]
     assert isinstance(decl, VarDecl)
     assert decl.type_name == "int"
     assert isinstance(decl.value, ParseCall)
@@ -307,16 +310,16 @@ def test_parses_dot_parse_in_var_decl():
 
 
 def test_parses_dot_parse_for_float_target():
-    program = parse_program('var bob: str = "3.14";\nvar f: float = bob.parse;')
+    statements = parse_program('var bob: str = "3.14";\nvar f: float = bob.parse;')
 
-    decl = program.statements[1]
+    decl = statements[1]
     assert isinstance(decl.value, ParseCall)
 
 
 def test_parses_bare_dot_parse_as_expression_statement():
-    program = parse_program('var bob: str = "42";\nbob.parse;')
+    statements = parse_program('var bob: str = "42";\nbob.parse;')
 
-    stmt = program.statements[1]
+    stmt = statements[1]
     assert isinstance(stmt, ExpressionStatement)
     assert isinstance(stmt.expression, ParseCall)
     assert stmt.expression.target.name == "bob"
@@ -341,31 +344,19 @@ def test_parses_class_main_wrapper():
     tokens = Lexer('class main() {\nprint("hi");\n}').tokenize()
     program = Parser(tokens).parse()
 
-    assert len(program.statements) == 1
-    assert isinstance(program.statements[0], PrintStatement)
+    assert len(program.classes["main"].body) == 1
+    assert isinstance(program.classes["main"].body[0], PrintStatement)
 
 
 def test_parses_class_main_with_trailing_semicolon():
     tokens = Lexer('class main() {\nprint("hi");\n};').tokenize()
     program = Parser(tokens).parse()
 
-    assert len(program.statements) == 1
+    assert len(program.classes["main"].body) == 1
 
 
-def test_rejects_missing_class_main():
-    tokens = Lexer('print("hi");').tokenize()
-    with pytest.raises(ParseError):
-        Parser(tokens).parse()
-
-
-def test_rejects_wrong_class_name():
-    tokens = Lexer('class foo() {\nprint("hi");\n}').tokenize()
-    with pytest.raises(ParseError):
-        Parser(tokens).parse()
-
-
-def test_rejects_content_after_class_main():
-    tokens = Lexer('class main() {\nprint("hi");\n}\nprint("outside");').tokenize()
+def test_rejects_empty_file():
+    tokens = Lexer("").tokenize()
     with pytest.raises(ParseError):
         Parser(tokens).parse()
 
@@ -374,4 +365,81 @@ def test_parses_empty_class_main():
     tokens = Lexer("class main() {}").tokenize()
     program = Parser(tokens).parse()
 
-    assert program.statements == []
+    assert program.classes["main"].body == []
+    assert program.classes["main"].is_ment is False
+
+
+def test_parses_ment_class():
+    tokens = Lexer('class bob(ment) {\nprint("bob running");\n}\nclass main() {}').tokenize()
+    program = Parser(tokens).parse()
+
+    assert program.classes["bob"].is_ment is True
+    assert program.classes["main"].is_ment is False
+
+
+def test_parses_init_class():
+    tokens = Lexer('class init() {\nprint("init");\n}\nclass main() {}').tokenize()
+    program = Parser(tokens).parse()
+
+    assert "init" in program.classes
+
+
+def test_parses_local_class_call():
+    source = 'class helper() {\nprint("hi");\n}\nclass main() {\nhelper;\n}'
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    call = program.classes["main"].body[0]
+    assert isinstance(call, CallStatement)
+    assert call.alias is None
+    assert call.name == "helper"
+
+
+def test_parses_forward_referenced_local_class_call():
+    # main calls helper, but helper is declared *after* main in the file.
+    source = 'class main() {\nhelper;\n}\nclass helper() {\nprint(\"hi\");\n}'
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    call = program.classes["main"].body[0]
+    assert isinstance(call, CallStatement)
+    assert call.name == "helper"
+
+
+def test_parses_mention_directive():
+    source = "@mentions test.el -> test;\nclass main() {}"
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    assert len(program.mentions) == 1
+    assert program.mentions[0].filename == "test.el"
+    assert program.mentions[0].alias == "test"
+
+
+def test_parses_aliased_class_call():
+    source = "@mentions test.el -> test;\nclass main() {\ntest.sdgdsg;\n}"
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    call = program.classes["main"].body[0]
+    assert isinstance(call, CallStatement)
+    assert call.alias == "test"
+    assert call.name == "sdgdsg"
+
+
+def test_rejects_duplicate_class_name():
+    source = "class main() {}\nclass main() {}"
+    tokens = Lexer(source).tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_file_with_no_main_parses_when_it_has_other_classes():
+    # A library-only file (no class main) is valid syntax on its own -
+    # the "needs an entry point" rule is enforced by the linker, not the
+    # parser, since a file might only ever be @mentions-ed, never run.
+    tokens = Lexer('class util(ment) {\nprint("hi");\n}').tokenize()
+    program = Parser(tokens).parse()
+
+    assert "main" not in program.classes
+    assert "util" in program.classes

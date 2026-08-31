@@ -23,6 +23,8 @@ class OpCode(Enum):
     DIV = auto()
     JUMP_IF_FALSE = auto()
     JUMP = auto()
+    CALL = auto()
+    RETURN = auto()
     POP = auto()
     HALT = auto()
 

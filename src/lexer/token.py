@@ -13,6 +13,8 @@ class TokenType(Enum):
     SEMICOLON = auto()
     COLON = auto()
     DOT = auto()
+    ARROW = auto()
+    AT = auto()
     EQUALS = auto()
     EQUALS_EQUALS = auto()
     NOT_EQUALS = auto()

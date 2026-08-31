@@ -4,24 +4,102 @@ Source files use the `.el` extension.
 
 ## Program structure
 
+A file is a sequence of `@mentions` imports (optional, must come first),
+followed by any number of named classes:
+
 ```
-class main() {
-    <statement>*
-}
+@mentions <file> -> <alias>;
+...
+
+class <NAME>() { <statement>* }
+class <NAME>(ment) { <statement>* }
 ```
 
-Every program's entire body must be inside `class main() { ... }` — it is
-the mandatory entry point, similar to `main` in Java or C#. There is
-nothing else at the top level: no statements before/after/outside the
-block, and no other classes. A single optional `;` is allowed right after
-the closing `}` (`class main() {...};`), purely cosmetic. `class main()`
-is not itself a general-purpose class construct yet — it has no fields, no
-methods beyond its body, and can't be instantiated; it exists solely to
-mark where the program starts.
+A class is a named, callable block of statements — not a general-purpose
+OOP class yet (see "Not yet implemented"). Two names are reserved with
+special meaning; everything else is an ordinary, freely-named class:
+
+- **`main`** — the program's entry point. A file being run directly
+  (`evlng --build`/`--run`) must define `class main() { ... }`; its body
+  runs first (after `init`, if present). A file that's only ever
+  `@mentions`-ed by another file doesn't need one.
+- **`init`** — optional. If present, its body runs once, automatically,
+  before `main`, in the same file.
+- **any other name** — not run automatically. Only executes when called,
+  either locally (`NAME;`, from anywhere in the same file, including
+  before its own declaration) or via `@mentions` (`alias.NAME;`, from
+  another file — see below).
+
+`main` and `init` behave this way regardless of `(ment)` — that modifier
+has no effect on local behavior; it only controls cross-file visibility
+(see `@mentions` below). A single optional `;` is allowed right after any
+class's closing `}`, purely cosmetic.
 
 ```
 class main() {
     print("Hello, World!");
+}
+```
+
+### calling a class
+
+```
+<NAME>;
+<ALIAS>.<NAME>;
+```
+
+Calling a class runs its body right there, like a named, parameterless
+procedure — not object instantiation (there is no `new`, no fields, no
+`this`). `NAME;` calls a class declared in the same file. `ALIAS.NAME;`
+calls a class from a file brought in with `@mentions` (below). Calls can
+appear anywhere a statement can, including inside other classes' bodies,
+`if` blocks, etc., and one class can call another any number of times.
+There is no return value and no parameters.
+
+```
+class helper() {
+    print("helper running");
+}
+
+class main() {
+    helper;
+    helper;   # can be called more than once
+}
+```
+
+### @mentions
+
+```
+@mentions <file> -> <alias>;
+```
+
+Imports another `.el` file (resolved relative to the file containing the
+`@mentions` line) under `<alias>`, resolved and compiled together with
+this file at build time (`evlng --build`). Only classes declared
+`(ment)` in the mentioned file become reachable, as `<alias>.<NAME>;` —
+classes without `(ment)` are invisible from outside their own file, even
+though they're still callable locally within it. The mentioned file's own
+`class main()` (if it even has one) is never run and has no special
+meaning to the importer — only its `(ment)` classes matter.
+
+`@mentions` only sees classes declared directly in the file it names —
+importing a file does not transitively expose whatever *that* file itself
+mentions. A cycle (file A mentions file B which mentions file A, directly
+or through a longer chain) is a build-time error.
+
+```
+@mentions test.el -> test;
+
+class main() {
+    test.sdgdsg;
+}
+```
+
+with `test.el` containing:
+
+```
+class sdgdsg(ment) {
+    print("Hello from another file!");
 }
 ```
 
@@ -249,8 +327,12 @@ print(pi);
 ## Grammar (informal)
 
 ```
-program        := "class" "main" "(" ")" block ";"?
-statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt | exprStmt
+program        := mention* classDecl+
+mention        := "@" "mentions" filename "->" IDENTIFIER ";"
+filename       := IDENTIFIER ("." IDENTIFIER)*
+classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
+statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt | exprStmt | callStmt
+callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
 assignment     := IDENTIFIER "=" expression ";"
@@ -270,6 +352,10 @@ primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER ("." "par
 inputCall      := "input" "(" STRING ")"
 ```
 
+A file that defines no `class main()` still parses successfully as long
+as it has at least one class or mention — it's only rejected (at build
+time, not parse time) if it's the file actually being compiled/run.
+
 ## Not yet implemented
 
 - Arithmetic as a general infix expression (only reachable via compound assignment right now)
@@ -279,4 +365,5 @@ inputCall      := "input" "(" STRING ")"
 - Functions
 - Block comments (`#` only comments to end of line)
 - `.parse`-equivalent for `bool` (a `str` can't currently be converted to `bool`)
-- Real classes: fields, methods, instantiation (`new`), multiple classes, inheritance — `class main()` currently only marks the program's entry point
+- Real OOP: fields, methods (beyond a single callable body), `new`/instantiation, `this`, inheritance, parameters, return values — classes are currently just named, callable blocks of statements
+- Quoted/path-style `@mentions` filenames (e.g. subdirectories) — the filename is a bare dotted identifier sequence, so it must look like a valid identifier chain (`utils.el`, not `"../lib/utils.el"`)
