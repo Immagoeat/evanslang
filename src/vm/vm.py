@@ -1,34 +1,10 @@
 from ir.ir import OpCode
 from ir.ir import Program as IrProgram
 from utils.errors import EvansLangError
+from utils.runtime import display, parse_as
 
 
-def _display(value):
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return value
-
-
-def _parse_as(text: str, target_type: str):
-    if target_type == "str":
-        return text
-    if target_type == "int":
-        try:
-            return int(text)
-        except ValueError:
-            raise EvansLangError(f"Cannot parse {text!r} as an int")
-    if target_type == "float":
-        try:
-            return float(text)
-        except ValueError:
-            raise EvansLangError(f"Cannot parse {text!r} as a float")
-    if target_type == "bool":
-        if text == "true":
-            return True
-        if text == "false":
-            return False
-        raise EvansLangError(f"Cannot parse {text!r} as a bool")
-    raise EvansLangError(f"Unknown parse target type {target_type!r}")
+MAX_CALL_DEPTH = 1000
 
 
 class VM:
@@ -56,11 +32,11 @@ class VM:
                 prompt = self.stack.pop()
                 self.stack.append(input(prompt))
             elif instruction.opcode == OpCode.PARSE:
-                self.stack.append(_parse_as(self.stack.pop(), instruction.operand))
+                self.stack.append(parse_as(self.stack.pop(), instruction.operand))
             elif instruction.opcode == OpCode.POP:
                 self.stack.pop()
             elif instruction.opcode == OpCode.PRINT:
-                print(_display(self.stack.pop()))
+                print(display(self.stack.pop()))
             elif instruction.opcode == OpCode.EQ:
                 right = self.stack.pop()
                 left = self.stack.pop()
@@ -126,6 +102,11 @@ class VM:
                 pc += instruction.operand
                 continue
             elif instruction.opcode == OpCode.CALL:
+                if len(self.call_stack) >= MAX_CALL_DEPTH:
+                    raise EvansLangError(
+                        f"Call stack exceeded {MAX_CALL_DEPTH} deep "
+                        "(likely unbounded recursion)"
+                    )
                 self.call_stack.append(pc + 1)
                 pc = instruction.operand
                 continue

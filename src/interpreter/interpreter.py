@@ -17,41 +17,24 @@ from nodes.nodes import (
     VarDecl,
     WhileStatement,
 )
-from linker.linker import SEPARATOR, ResolvedProgram
+from linker.linker import ResolvedProgram
 from utils.errors import EvansLangError
+from utils.runtime import display, parse_as
 
 
-def _display(value):
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    return value
-
-
-def _parse_as(text: str, target_type: str):
-    if target_type == "str":
-        return text
-    if target_type == "int":
-        try:
-            return int(text)
-        except ValueError:
-            raise EvansLangError(f"Cannot parse {text!r} as an int")
-    if target_type == "float":
-        try:
-            return float(text)
-        except ValueError:
-            raise EvansLangError(f"Cannot parse {text!r} as a float")
-    if target_type == "bool":
-        if text == "true":
-            return True
-        if text == "false":
-            return False
-        raise EvansLangError(f"Cannot parse {text!r} as a bool")
-    raise EvansLangError(f"Unknown parse target type {target_type!r}")
+# Lower than the VM's limit: the interpreter uses native Python recursion
+# (_run_class -> _execute -> _run_class -> ...), costing several Python
+# stack frames per evanslang-level call, so this must stay well under
+# Python's own default recursion limit (sys.getrecursionlimit(), 1000) to
+# ensure this raises a clean EvansLangError before Python raises its own
+# uncatchable-by-our-error-handling RecursionError.
+MAX_CALL_DEPTH = 200
 
 
 class Interpreter:
     def __init__(self):
         self.variables = {}
+        self.call_depth = 0
 
     def run(self, resolved: ResolvedProgram):
         self.classes = resolved.classes
@@ -60,18 +43,30 @@ class Interpreter:
         self._run_class(resolved.entry)
 
     def _run_class(self, name: str) -> None:
-        for statement in self.classes[name].body:
-            self._execute(statement)
+        if self.call_depth >= MAX_CALL_DEPTH:
+            raise EvansLangError(
+                f"Call stack exceeded {MAX_CALL_DEPTH} deep "
+                "(likely unbounded recursion)"
+            )
+        self.call_depth += 1
+        try:
+            for statement in self.classes[name].body:
+                self._execute(statement)
+        finally:
+            self.call_depth -= 1
 
     def _execute(self, node):
         if isinstance(node, CallStatement):
-            target = node.name if node.alias is None else f"{node.alias}{SEPARATOR}{node.name}"
-            if target not in self.classes:
-                raise EvansLangError(f"Call to undefined class {target!r}")
-            self._run_class(target)
+            # resolved_target is computed by the linker, using the alias
+            # table of whichever file this call was parsed in.
+            if node.resolved_target is None or node.resolved_target not in self.classes:
+                raise EvansLangError(
+                    f"Internal error: call to {node.name!r} was never resolved"
+                )
+            self._run_class(node.resolved_target)
             return
         if isinstance(node, PrintStatement):
-            print(_display(self._evaluate(node.argument)))
+            print(display(self._evaluate(node.argument)))
             return
         if isinstance(node, VarDecl):
             if node.value is not None:
@@ -129,7 +124,7 @@ class Interpreter:
         if isinstance(node, InputCall):
             return input(self._evaluate(node.prompt))
         if isinstance(node, ParseCall):
-            return _parse_as(self._evaluate(node.target), node.target_type)
+            return parse_as(self._evaluate(node.target), node.target_type)
         if isinstance(node, BinaryOp):
             left = self._evaluate(node.left)
             right = self._evaluate(node.right)

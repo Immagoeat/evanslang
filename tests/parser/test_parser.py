@@ -546,3 +546,33 @@ def test_parses_for_with_trailing_semicolon():
 def test_rejects_for_with_invalid_init_clause():
     with pytest.raises(ParseError):
         parse_program('for (print("x"); true;) {}')
+
+
+def test_rejects_explicit_local_call_to_init():
+    # init already runs automatically before main; calling it explicitly
+    # would run its body twice.
+    source = 'class init() {\nprint("setup");\n}\nclass main() {\ninit;\n}'
+    tokens = Lexer(source).tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_rejects_explicit_local_call_to_main():
+    source = 'class main() {\nprint("hi");\nmain;\n}'
+    tokens = Lexer(source).tokenize()
+    with pytest.raises(ParseError):
+        Parser(tokens).parse()
+
+
+def test_allows_calling_a_mentioned_files_main_via_alias():
+    # A mentioned file's own class main() never auto-runs, so calling it
+    # explicitly via alias.main is fine - the double-run risk only exists
+    # for LOCAL, unaliased calls to the file's own main/init.
+    source = "@mentions lib.el -> lib;\nclass main() {\nlib.main;\n}"
+    tokens = Lexer(source).tokenize()
+    program = Parser(tokens).parse()
+
+    call = program.classes["main"].body[0]
+    assert isinstance(call, CallStatement)
+    assert call.alias == "lib"
+    assert call.name == "main"

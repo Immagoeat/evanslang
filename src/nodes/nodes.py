@@ -185,9 +185,18 @@ class CallStatement(Node):
     def __init__(self, alias: str | None, name: str):
         self.alias = alias
         self.name = name
+        # Filled in by the linker: the fully-qualified key into
+        # ResolvedProgram.classes that this call actually resolves to,
+        # computed using the ALIAS TABLE OF THE FILE THIS CALL WAS PARSED
+        # IN (not the root file's), so a mentioned file's own @mentions
+        # still work correctly when that file is itself linked in.
+        self.resolved_target: str | None = None
 
     def __repr__(self):
-        return f"CallStatement(alias={self.alias!r}, name={self.name!r})"
+        return (
+            f"CallStatement(alias={self.alias!r}, name={self.name!r}, "
+            f"resolved_target={self.resolved_target!r})"
+        )
 
 
 class Program(Node):

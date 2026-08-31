@@ -19,7 +19,7 @@ from nodes.nodes import (
 )
 from ir.ir import Instruction, OpCode
 from ir.ir import Program as IrProgram
-from linker.linker import SEPARATOR, ResolvedProgram
+from linker.linker import ResolvedProgram
 from utils.errors import EvansLangError
 
 BINARY_OPCODES = {
@@ -73,22 +73,30 @@ class CodeGenerator:
             if instruction.opcode == OpCode.CALL:
                 target = instruction.operand
                 if target not in block_starts:
-                    if SEPARATOR in target:
-                        alias, name = target.split(SEPARATOR, 1)
-                        raise EvansLangError(
-                            f"{name!r} is not a mentionable class in the file "
-                            f"mentioned as {alias!r} (mark it 'class {name}(ment) {{}}' "
-                            f"to make it reachable, or check the class exists)"
-                        )
-                    raise EvansLangError(f"Call to undefined class {target!r}")
+                    # The linker already validates every CallStatement's
+                    # target (existence and (ment)-ness) before codegen
+                    # ever runs, so reaching this means an internal
+                    # inconsistency rather than a user-facing mistake.
+                    raise EvansLangError(
+                        f"Internal error: call to undefined class {target!r}"
+                    )
                 instruction.operand = block_starts[target]
 
         return IrProgram(instructions)
 
     def _generate_statement(self, node) -> list[Instruction]:
         if isinstance(node, CallStatement):
-            target = node.name if node.alias is None else f"{node.alias}{SEPARATOR}{node.name}"
-            return [Instruction(OpCode.CALL, target)]
+            # resolved_target is computed by the linker, using the alias
+            # table of whichever FILE this call was parsed in - not a
+            # naive f"{alias}::{name}" derived here, since that would be
+            # wrong whenever the call reaches into a file that was itself
+            # linked in under a different scope/alias than `node.alias`.
+            if node.resolved_target is None:
+                raise EvansLangError(
+                    f"Internal error: call to {node.name!r} was never "
+                    "resolved by the linker"
+                )
+            return [Instruction(OpCode.CALL, node.resolved_target)]
         if isinstance(node, PrintStatement):
             return [
                 *self._generate_expression(node.argument),

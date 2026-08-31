@@ -53,8 +53,21 @@ procedure — not object instantiation (there is no `new`, no fields, no
 `this`). `NAME;` calls a class declared in the same file. `ALIAS.NAME;`
 calls a class from a file brought in with `@mentions` (below). Calls can
 appear anywhere a statement can, including inside other classes' bodies,
-`if` blocks, etc., and one class can call another any number of times.
+`if`/`while`/`for` bodies, etc., and one class can call another any number
+of times, including recursively (bounded — see "call depth" below).
 There is no return value and no parameters.
+
+`NAME;` (the unaliased, local form) cannot target `main` or `init` in the
+*same* file — both already run automatically, so calling either explicitly
+would run its body a second time; this is rejected at parse time. This
+restriction is specific to local calls: `alias.main;`/`alias.init;` are
+fine, since a *mentioned* file's `main`/`init` never auto-run in the first
+place — only the entry file's do.
+
+Calls can recurse (a class calling itself, directly or through other
+classes) up to a fixed depth (currently 1000 in the compiled/`--run` path,
+lower in the tree-walking interpreter); exceeding it is a runtime error
+rather than a hang or a crash, so unbounded recursion fails cleanly.
 
 ```
 class helper() {
@@ -84,8 +97,22 @@ meaning to the importer — only its `(ment)` classes matter.
 
 `@mentions` only sees classes declared directly in the file it names —
 importing a file does not transitively expose whatever *that* file itself
-mentions. A cycle (file A mentions file B which mentions file A, directly
-or through a longer chain) is a build-time error.
+mentions to *your* file. If `a.el` mentions `b.el`, and `b.el` separately
+mentions `c.el`, `a.el` has no way to reach `c.el`'s classes — only
+`b.el`'s own `(ment)` classes, under the alias `a.el` gave them. This
+holds even though `b.el`'s own class bodies can still freely use `b.el`'s
+own `@mentions` — a mentioned file's `@mentions` always resolve using
+*that file's own* alias table, regardless of how the file itself was
+reached, so a library file that itself depends on other files keeps
+working correctly when mentioned by something else.
+
+Two different `@mentions` lines in the same file may not reuse the same
+alias for two different files — that's a build-time error. The same file
+mentioned (under any alias, from any number of different files) is only
+ever read and linked once. A file mentioning itself, or a longer cycle
+(A mentions B, B mentions A), is not an error — each file is still only
+linked once; the second, cyclic edge is simply a no-op re-entry into a
+file already fully linked.
 
 ```
 @mentions test.el -> test;

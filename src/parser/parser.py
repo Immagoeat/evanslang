@@ -193,6 +193,14 @@ class Parser:
             self._expect(TokenType.SEMICOLON)
             return CallStatement(first_token.value, name_token.value)
         self._expect(TokenType.SEMICOLON)
+        if first_token.value in RESERVED_CLASS_NAMES:
+            raise ParseError(
+                f"Cannot call {first_token.value!r} explicitly - it already "
+                "runs automatically"
+                + (" as the entry point" if first_token.value == "main" else " before main"),
+                first_token.line,
+                first_token.column,
+            )
         return CallStatement(None, first_token.value)
 
     def _parse_expression_statement(self) -> ExpressionStatement:
