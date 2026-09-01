@@ -24,6 +24,7 @@ class TokenType(Enum):
     GREATER_EQUALS = auto()
     AND_AND = auto()
     OR_OR = auto()
+    AMPERSAND = auto()
     BANG = auto()
     PLUS_EQUALS = auto()
     MINUS_EQUALS = auto()

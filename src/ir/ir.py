@@ -30,6 +30,9 @@ class OpCode(Enum):
     TRY_BEGIN = auto()
     TRY_END = auto()
     THROW = auto()
+    ADDR_OF = auto()
+    DEREF = auto()
+    DEREF_STORE = auto()
     HALT = auto()
 
 

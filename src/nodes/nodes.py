@@ -61,6 +61,31 @@ class Assignment(Node):
         return f"Assignment({self.name!r}, {self.value!r})"
 
 
+class AddressOf(Node):
+    def __init__(self, name: str):
+        self.name = name
+
+    def __repr__(self):
+        return f"AddressOf({self.name!r})"
+
+
+class Dereference(Node):
+    def __init__(self, operand: Node):
+        self.operand = operand
+
+    def __repr__(self):
+        return f"Dereference({self.operand!r})"
+
+
+class DerefAssignment(Node):
+    def __init__(self, pointer: Node, value: Node):
+        self.pointer = pointer
+        self.value = value
+
+    def __repr__(self):
+        return f"DerefAssignment({self.pointer!r}, {self.value!r})"
+
+
 class InputCall(Node):
     def __init__(self, prompt: Node):
         self.prompt = prompt

@@ -98,7 +98,7 @@
       "patterns": [
         {
           "name": "support.type.evanslang",
-          "match": "\\b(int|float|str|bool)\\b"
+          "match": "\\b(ptr|int|float|str|bool)\\b"
         }
       ]
     },
@@ -146,6 +146,10 @@
         {
           "name": "keyword.operator.assignment.evanslang",
           "match": "="
+        },
+        {
+          "name": "keyword.operator.pointer.evanslang",
+          "match": "(&|\\*)(?=\\s*[A-Za-z_])"
         },
         {
           "name": "keyword.operator.arithmetic.evanslang",

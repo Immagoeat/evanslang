@@ -193,3 +193,91 @@ def test_try_catch_inside_a_loop_resets_each_iteration():
         "}"
     )
     assert lines == ["0", "loop error", "2"]
+
+
+def test_dereferencing_a_pointer_reads_the_pointee():
+    lines = build_run_capture(
+        'class main() {\n'
+        "var x: int = 10;\n"
+        "var p: ptr<int> = &x;\n"
+        "print(*p);\n"
+        "}"
+    )
+    assert lines == ["10"]
+
+
+def test_writing_through_a_pointer_mutates_the_pointee():
+    lines = build_run_capture(
+        'class main() {\n'
+        "var x: int = 10;\n"
+        "var p: ptr<int> = &x;\n"
+        "*p = 99;\n"
+        "print(x);\n"
+        "}"
+    )
+    assert lines == ["99"]
+
+
+def test_reassigning_the_pointee_var_is_visible_through_the_pointer():
+    lines = build_run_capture(
+        'class main() {\n'
+        "var x: int = 1;\n"
+        "var p: ptr<int> = &x;\n"
+        "x = 50;\n"
+        "print(*p);\n"
+        "}"
+    )
+    assert lines == ["50"]
+
+
+def test_pointer_can_be_reassigned_to_a_different_variable():
+    lines = build_run_capture(
+        'class main() {\n'
+        "var x: int = 1;\n"
+        "var y: int = 2;\n"
+        "var p: ptr<int> = &x;\n"
+        "p = &y;\n"
+        "*p = 42;\n"
+        "print(y);\n"
+        "print(x);\n"
+        "}"
+    )
+    assert lines == ["42", "1"]
+
+
+def test_pointer_works_with_str_float_bool():
+    lines = build_run_capture(
+        'class main() {\n'
+        'var s: str = "hi";\n'
+        "var ps: ptr<str> = &s;\n"
+        '*ps = "bye";\n'
+        "print(s);\n"
+        "var f: float = 1.5;\n"
+        "var pf: ptr<float> = &f;\n"
+        "*pf = *pf + 1.0;\n"
+        "print(f);\n"
+        "var b: bool = true;\n"
+        "var pb: ptr<bool> = &b;\n"
+        "*pb = false;\n"
+        "print(b);\n"
+        "}"
+    )
+    assert lines == ["bye", "2.5", "false"]
+
+
+def test_dereferencing_through_a_thrown_and_caught_error_still_works():
+    # Regression check: the interpreter's catch-var binding must box the
+    # caught message the same way every other variable is boxed, or a
+    # later &e/*p on it breaks.
+    lines = build_run_capture(
+        'class main() {\n'
+        "var x: int = 5;\n"
+        "var p: ptr<int> = &x;\n"
+        "try {\n"
+        'var bad: int = *p + "oops";\n'
+        "}\n"
+        'catch (e: str) {\nprint(e);\n}\n'
+        "print(*p);\n"
+        "}"
+    )
+    assert lines == ["Cannot apply '+' to int and str", "5"]

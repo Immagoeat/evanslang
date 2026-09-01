@@ -1,9 +1,12 @@
 from nodes.nodes import (
+    AddressOf,
     Assignment,
     BinaryOp,
     BoolLiteral,
     CallStatement,
     ClassDecl,
+    Dereference,
+    DerefAssignment,
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
@@ -26,6 +29,7 @@ from lexer.token import Token, TokenType
 from utils.errors import ParseError
 
 VALID_TYPES = {"int", "str", "float", "bool"}
+POINTABLE_TYPES = {"int", "str", "float", "bool"}
 RESERVED_CLASS_NAMES = {"main", "init"}
 
 COMPOUND_OPERATORS = {
@@ -169,6 +173,8 @@ class Parser:
             return self._parse_try_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "throw":
             return self._parse_throw_statement()
+        if token.type == TokenType.STAR:
+            return self._parse_deref_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
             return self._parse_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
@@ -222,34 +228,55 @@ class Parser:
         self._expect(TokenType.SEMICOLON)
         return PrintStatement(argument)
 
-    def _parse_var_decl(self, consume_semicolon: bool = True) -> VarDecl:
-        self._expect(TokenType.IDENTIFIER, "var")
-        name_token = self._expect(TokenType.IDENTIFIER)
-        self._expect(TokenType.COLON)
+    def _parse_type_name(self) -> str:
+        # Either a plain type (int/str/float/bool) or a pointer type
+        # ptr<type>, where <type> must itself be one of POINTABLE_TYPES
+        # (no pointer-to-pointer yet). Returned as a single string
+        # ("int" or "ptr<int>") so it threads through declared_types the
+        # same way plain types already do, without restructuring that
+        # dict's value type.
         type_token = self._expect(TokenType.IDENTIFIER)
+        if type_token.value == "ptr":
+            self._expect(TokenType.LESS)
+            inner_token = self._expect(TokenType.IDENTIFIER)
+            if inner_token.value not in POINTABLE_TYPES:
+                raise ParseError(
+                    f"Unknown type {inner_token.value!r} in ptr<...>",
+                    inner_token.line,
+                    inner_token.column,
+                )
+            self._expect(TokenType.GREATER)
+            return f"ptr<{inner_token.value}>"
         if type_token.value not in VALID_TYPES:
             raise ParseError(
                 f"Unknown type {type_token.value!r}",
                 type_token.line,
                 type_token.column,
             )
+        return type_token.value
 
-        self.declared_types[name_token.value] = type_token.value
+    def _parse_var_decl(self, consume_semicolon: bool = True) -> VarDecl:
+        self._expect(TokenType.IDENTIFIER, "var")
+        name_token = self._expect(TokenType.IDENTIFIER)
+        self._expect(TokenType.COLON)
+        type_name = self._parse_type_name()
+
+        self.declared_types[name_token.value] = type_name
 
         if self._peek().type == TokenType.SEMICOLON:
             if consume_semicolon:
                 self._advance()
-            return VarDecl(name_token.value, type_token.value, None)
+            return VarDecl(name_token.value, type_name, None)
         if not consume_semicolon and self._peek().type == TokenType.RPAREN:
-            return VarDecl(name_token.value, type_token.value, None)
+            return VarDecl(name_token.value, type_name, None)
 
         self._expect(TokenType.EQUALS)
         value = self._parse_expression()
         if consume_semicolon:
             self._expect(TokenType.SEMICOLON)
-        self._check_type(name_token, type_token.value, value)
+        self._check_type(name_token, type_name, value)
 
-        return VarDecl(name_token.value, type_token.value, value)
+        return VarDecl(name_token.value, type_name, value)
 
     def _parse_if_statement(self) -> IfStatement:
         self._expect(TokenType.IDENTIFIER, "if")
@@ -391,6 +418,37 @@ class Parser:
 
         return Assignment(name_token.value, value)
 
+    def _parse_deref_assignment(self, consume_semicolon: bool = True) -> DerefAssignment:
+        self._expect(TokenType.STAR)
+        pointer_token = self._expect(TokenType.IDENTIFIER)
+        pointer = Identifier(pointer_token.value)
+        self._expect(TokenType.EQUALS)
+        value = self._parse_expression()
+        if consume_semicolon:
+            self._expect(TokenType.SEMICOLON)
+
+        pointer_type = self.declared_types.get(pointer_token.value)
+        if pointer_type is None:
+            raise ParseError(
+                f"Assignment through undeclared variable {pointer_token.value!r}",
+                pointer_token.line,
+                pointer_token.column,
+            )
+        if not pointer_type.startswith("ptr<"):
+            raise ParseError(
+                f"Cannot dereference non-pointer variable {pointer_token.value!r} "
+                f"(declared {pointer_type!r})",
+                pointer_token.line,
+                pointer_token.column,
+            )
+        pointee_type = pointer_type[len("ptr<") : -1]
+        # Reuse a synthetic Token so _check_type's error messages read
+        # naturally ("variable 'p'" -> what's actually being written
+        # through is p's pointee, so name the pointer for context).
+        self._check_type(pointer_token, pointee_type, value)
+
+        return DerefAssignment(pointer, value)
+
     def _parse_compound_assignment(self, consume_semicolon: bool = True) -> Assignment:
         name_token = self._expect(TokenType.IDENTIFIER)
         op_token = self._advance()
@@ -440,6 +498,24 @@ class Parser:
         return Assignment(name_token.value, value)
 
     def _check_type(self, name_token: Token, type_name: str, value) -> None:
+        if isinstance(value, AddressOf):
+            if not type_name.startswith("ptr<"):
+                raise ParseError(
+                    f"Cannot assign a pointer to {type_name!r} variable "
+                    f"{name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+            pointee_type = type_name[len("ptr<") : -1]
+            target_type = self.declared_types.get(value.name)
+            if target_type != pointee_type:
+                raise ParseError(
+                    f"Cannot assign &{value.name} ({target_type or 'undeclared'}) "
+                    f"to {type_name!r} variable {name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+            return
         if isinstance(value, ParseCall):
             if value.target_type != type_name:
                 raise ParseError(
@@ -524,6 +600,16 @@ class Parser:
                 name_token.line,
                 name_token.column,
             )
+        if type_name.startswith("ptr<"):
+            # Reachable only when value wasn't an AddressOf (handled, with
+            # its own return, above) - so anything getting here is not a
+            # pointer expression at all.
+            raise ParseError(
+                f"Cannot assign a non-pointer value to {type_name!r} "
+                f"variable {name_token.value!r}",
+                name_token.line,
+                name_token.column,
+            )
 
     def _parse_expression(self):
         return self._parse_or()
@@ -583,6 +669,18 @@ class Parser:
             self._advance()
             operand = self._parse_unary_minus()
             return UnaryOp("-", operand)
+        if self._peek().type == TokenType.STAR:
+            # Unambiguous with multiplication: '*' as multiplication is
+            # only ever consumed one level up, in _parse_multiplicative's
+            # infix loop, so a STAR reaching here is always a prefix
+            # dereference (e.g. "*p" or "*p + 1").
+            self._advance()
+            operand = self._parse_unary_minus()
+            return Dereference(operand)
+        if self._peek().type == TokenType.AMPERSAND:
+            self._advance()
+            name_token = self._expect(TokenType.IDENTIFIER)
+            return AddressOf(name_token.value)
         return self._parse_primary()
 
     def _parse_primary(self):

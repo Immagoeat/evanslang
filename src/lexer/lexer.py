@@ -92,6 +92,10 @@ class Lexer:
             self._advance()
             return Token(TokenType.AND_AND, "&&", line, column)
 
+        if char == "&":
+            self._advance()
+            return Token(TokenType.AMPERSAND, "&", line, column)
+
         if char == "|" and self._peek_char(1) == "|":
             self._advance()
             self._advance()

@@ -1,8 +1,11 @@
 from nodes.nodes import (
+    AddressOf,
     Assignment,
     BinaryOp,
     BoolLiteral,
     CallStatement,
+    Dereference,
+    DerefAssignment,
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
@@ -116,6 +119,12 @@ class CodeGenerator:
             return [
                 *self._generate_expression(node.value),
                 Instruction(OpCode.STORE, node.name),
+            ]
+        if isinstance(node, DerefAssignment):
+            return [
+                *self._generate_expression(node.pointer),
+                *self._generate_expression(node.value),
+                Instruction(OpCode.DEREF_STORE),
             ]
         if isinstance(node, IfStatement):
             return self._generate_if(node)
@@ -268,6 +277,13 @@ class CodeGenerator:
             return [Instruction(OpCode.PUSH_CONST, node.value)]
         if isinstance(node, Identifier):
             return [Instruction(OpCode.LOAD, node.name)]
+        if isinstance(node, AddressOf):
+            return [Instruction(OpCode.ADDR_OF, node.name)]
+        if isinstance(node, Dereference):
+            return [
+                *self._generate_expression(node.operand),
+                Instruction(OpCode.DEREF),
+            ]
         if isinstance(node, InputCall):
             return [
                 *self._generate_expression(node.prompt),

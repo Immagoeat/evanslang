@@ -6,10 +6,13 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 import pytest
 
 from nodes.nodes import (
+    AddressOf,
     Assignment,
     BinaryOp,
     BoolLiteral,
     CallStatement,
+    Dereference,
+    DerefAssignment,
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
@@ -655,3 +658,66 @@ def test_catch_variable_is_declared_as_str():
 def test_rejects_try_without_catch():
     with pytest.raises(ParseError):
         parse_program('try {\nprint("a");\n}')
+
+
+def test_parses_pointer_var_decl():
+    statements = parse_program("var x: int = 5;\nvar p: ptr<int> = &x;")
+
+    decl = statements[1]
+    assert isinstance(decl, VarDecl)
+    assert decl.type_name == "ptr<int>"
+    assert isinstance(decl.value, AddressOf)
+    assert decl.value.name == "x"
+
+
+def test_parses_dereference_in_expression():
+    statements = parse_program(
+        "var x: int = 5;\nvar p: ptr<int> = &x;\nprint(*p);"
+    )
+    print_stmt = statements[2]
+    assert isinstance(print_stmt.argument, Dereference)
+    assert isinstance(print_stmt.argument.operand, Identifier)
+    assert print_stmt.argument.operand.name == "p"
+
+
+def test_parses_deref_assignment():
+    statements = parse_program(
+        "var x: int = 5;\nvar p: ptr<int> = &x;\n*p = 10;"
+    )
+    assign = statements[2]
+    assert isinstance(assign, DerefAssignment)
+    assert isinstance(assign.pointer, Identifier)
+    assert assign.pointer.name == "p"
+    assert isinstance(assign.value, IntLiteral)
+    assert assign.value.value == 10
+
+
+def test_pointer_reassignment_to_another_variable():
+    statements = parse_program(
+        "var x: int = 1;\nvar y: int = 2;\n"
+        "var p: ptr<int> = &x;\np = &y;"
+    )
+    reassign = statements[3]
+    assert isinstance(reassign, Assignment)
+    assert isinstance(reassign.value, AddressOf)
+    assert reassign.value.name == "y"
+
+
+def test_rejects_pointer_to_mismatched_type():
+    with pytest.raises(ParseError):
+        parse_program("var x: int = 5;\nvar p: ptr<str> = &x;")
+
+
+def test_rejects_dereferencing_a_non_pointer():
+    with pytest.raises(ParseError):
+        parse_program("var x: int = 5;\n*x = 10;")
+
+
+def test_rejects_unknown_pointee_type():
+    with pytest.raises(ParseError):
+        parse_program("var p: ptr<nonsense> = &x;")
+
+
+def test_rejects_non_pointer_value_assigned_to_ptr_variable():
+    with pytest.raises(ParseError):
+        parse_program("var x: int = 5;\nvar p: ptr<int> = 5;")

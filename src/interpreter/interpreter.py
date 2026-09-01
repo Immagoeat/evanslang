@@ -1,8 +1,11 @@
 from nodes.nodes import (
+    AddressOf,
     Assignment,
     BinaryOp,
     BoolLiteral,
     CallStatement,
+    Dereference,
+    DerefAssignment,
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
@@ -21,7 +24,7 @@ from nodes.nodes import (
 )
 from linker.linker import ResolvedProgram
 from utils.errors import EvansLangError
-from utils.runtime import display, parse_as
+from utils.runtime import Cell, display, parse_as
 
 
 # Lower than the VM's limit: the interpreter uses native Python recursion
@@ -57,6 +60,15 @@ class Interpreter:
         finally:
             self.call_depth -= 1
 
+    def _store(self, name: str, value) -> None:
+        cell = self.variables.get(name)
+        if cell is None:
+            self.variables[name] = Cell(value)
+        else:
+            # Reuse the existing Cell so a pointer taken via &x before this
+            # assignment still observes the new value afterward.
+            cell.value = value
+
     def _execute(self, node):
         if isinstance(node, CallStatement):
             # resolved_target is computed by the linker, using the alias
@@ -72,10 +84,16 @@ class Interpreter:
             return
         if isinstance(node, VarDecl):
             if node.value is not None:
-                self.variables[node.name] = self._evaluate(node.value)
+                self._store(node.name, self._evaluate(node.value))
             return
         if isinstance(node, Assignment):
-            self.variables[node.name] = self._evaluate(node.value)
+            self._store(node.name, self._evaluate(node.value))
+            return
+        if isinstance(node, DerefAssignment):
+            cell = self._evaluate(node.pointer)
+            if not isinstance(cell, Cell):
+                raise EvansLangError("Cannot dereference a non-pointer value")
+            cell.value = self._evaluate(node.value)
             return
         if isinstance(node, IfStatement):
             if self._evaluate(node.condition):
@@ -113,7 +131,7 @@ class Interpreter:
                 for statement in node.try_body:
                     self._execute(statement)
             except EvansLangError as error:
-                self.variables[node.catch_var_name] = error.message
+                self._store(node.catch_var_name, error.message)
                 for statement in node.catch_body:
                     self._execute(statement)
             return
@@ -138,7 +156,16 @@ class Interpreter:
         if isinstance(node, Identifier):
             if node.name not in self.variables:
                 raise EvansLangError(f"Undefined variable {node.name!r}")
+            return self.variables[node.name].value
+        if isinstance(node, AddressOf):
+            if node.name not in self.variables:
+                raise EvansLangError(f"Undefined variable {node.name!r}")
             return self.variables[node.name]
+        if isinstance(node, Dereference):
+            cell = self._evaluate(node.operand)
+            if not isinstance(cell, Cell):
+                raise EvansLangError("Cannot dereference a non-pointer value")
+            return cell.value
         if isinstance(node, InputCall):
             return input(self._evaluate(node.prompt))
         if isinstance(node, ParseCall):

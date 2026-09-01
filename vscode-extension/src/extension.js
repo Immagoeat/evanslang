@@ -1,7 +1,7 @@
 const vscode = require("vscode");
 
 const KEYWORDS = ["class", "var", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "ment", "mentions"];
-const TYPES = ["int", "str", "float", "bool"];
+const TYPES = ["int", "str", "float", "bool", "ptr"];
 const BUILTINS = ["print", "input"];
 const BOOLEAN_LITERALS = ["true", "false"];
 
@@ -107,6 +107,13 @@ function snippetCompletions() {
   const throwStmt = new vscode.CompletionItem("throw", vscode.CompletionItemKind.Snippet);
   throwStmt.insertText = new vscode.SnippetString('throw "${1:message}";');
   items.push(throwStmt);
+
+  const ptrDecl = new vscode.CompletionItem("ptr", vscode.CompletionItemKind.Snippet);
+  ptrDecl.insertText = new vscode.SnippetString(
+    "var ${1:p}: ptr<${2|int,str,float,bool|}> = &${3:variable};"
+  );
+  ptrDecl.detail = "Pointer variable declaration";
+  items.push(ptrDecl);
 
   return items;
 }

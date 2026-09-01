@@ -1,7 +1,7 @@
 from ir.ir import OpCode
 from ir.ir import Program as IrProgram
 from utils.errors import EvansLangError
-from utils.runtime import display, parse_as
+from utils.runtime import Cell, display, parse_as
 
 
 MAX_CALL_DEPTH = 1000
@@ -41,13 +41,39 @@ class VM:
         if instruction.opcode == OpCode.PUSH_CONST:
             self.stack.append(instruction.operand)
         elif instruction.opcode == OpCode.STORE:
-            self.variables[instruction.operand] = self.stack.pop()
+            value = self.stack.pop()
+            cell = self.variables.get(instruction.operand)
+            if cell is None:
+                self.variables[instruction.operand] = Cell(value)
+            else:
+                # Reuse the existing Cell (rather than replacing it with a
+                # fresh one) so a pointer taken via &x before this STORE
+                # still observes the new value afterward - pointers are
+                # reassignable per-variable-slot, not per-value.
+                cell.value = value
         elif instruction.opcode == OpCode.LOAD:
             if instruction.operand not in self.variables:
                 raise EvansLangError(
                     f"Undefined variable {instruction.operand!r}"
                 )
+            self.stack.append(self.variables[instruction.operand].value)
+        elif instruction.opcode == OpCode.ADDR_OF:
+            if instruction.operand not in self.variables:
+                raise EvansLangError(
+                    f"Undefined variable {instruction.operand!r}"
+                )
             self.stack.append(self.variables[instruction.operand])
+        elif instruction.opcode == OpCode.DEREF:
+            cell = self.stack.pop()
+            if not isinstance(cell, Cell):
+                raise EvansLangError("Cannot dereference a non-pointer value")
+            self.stack.append(cell.value)
+        elif instruction.opcode == OpCode.DEREF_STORE:
+            value = self.stack.pop()
+            cell = self.stack.pop()
+            if not isinstance(cell, Cell):
+                raise EvansLangError("Cannot dereference a non-pointer value")
+            cell.value = value
         elif instruction.opcode == OpCode.INPUT:
             prompt = self.stack.pop()
             self.stack.append(input(prompt))

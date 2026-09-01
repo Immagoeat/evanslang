@@ -374,6 +374,50 @@ class main() {
 }
 ```
 
+### pointers
+
+```
+var <NAME>: ptr<type> = &<VARIABLE>;
+*<NAME>
+*<NAME> = <expression>;
+```
+
+`ptr<type>` declares a pointer variable, where `<type>` is one of `int`,
+`str`, `float`, `bool` (pointer-to-pointer, `ptr<ptr<...>>`, isn't
+supported). `&<VARIABLE>` (address-of) takes a pointer to an existing,
+already-declared variable of that same `<type>` — the types must match
+exactly, the same as every other `var` initializer. `*<NAME>`
+(dereference) reads through the pointer to get the pointee's current
+value, usable anywhere an expression is valid; `*<NAME> = <expression>;`
+writes through the pointer, mutating the pointee variable itself (not just
+the pointer). A pointer variable can be reassigned to point at a different
+variable later, the same as any other `var`:
+
+```
+var x: int = 10;
+var p: ptr<int> = &x;
+print(*p);       # 10
+*p = 99;
+print(x);        # 99 - the write went through to x
+
+var y: int = 5;
+p = &y;          # p now points at y instead
+*p = 1;
+print(y);        # 1
+print(x);        # still 99 - x is untouched
+```
+
+Dereferencing a variable that isn't a pointer, or a pointer whose declared
+pointee type doesn't match how it's used, is a parse-time error — the same
+static checking as any other `var`. Reading/writing through a pointer
+whose pointee has since gone out of scope isn't a concern yet, since
+evanslang has no per-block variable scoping (a `var` lives for the rest of
+its enclosing class body, same as everywhere else in the language).
+`*<NAME> += <expression>;` (compound assignment through a pointer) isn't
+supported yet — use `*<NAME> = *<NAME> + <expression>;` instead.
+`print(<pointer>)` (printing the pointer itself, not `*<pointer>`) prints
+an opaque `ptr@<address>` marker rather than the pointee's value.
+
 ### comments
 
 ```
@@ -398,10 +442,13 @@ print(bob);
 | `int`   | Whole numbers (no sign yet)             | `9`              |
 | `float` | Decimal numbers (requires a digit on both sides of the `.`) | `3.14` |
 | `bool`  | `true` or `false`                       | `true`           |
+| `ptr<type>` | A pointer to an `int`/`str`/`float`/`bool` variable | `&x` |
 
 `int` and `float` are always distinct — an `int` variable can never hold a
 `float` value or vice versa, in `var`, plain assignment, or compound
 assignment. There's no automatic widening (e.g. `int` → `float`).
+`ptr<type>` is itself a distinct type per pointee `type` (`ptr<int>` and
+`ptr<str>` don't mix) — see "pointers" above.
 
 ## Expressions
 
@@ -419,14 +466,20 @@ Currently supported expressions:
   `for` conditions, compound assignment, etc.) and unary `-` (negation,
   prefix, e.g. `-x`)
 - Parenthesized expressions: `(<expression>)`, to override precedence
+- `&<VARIABLE>` (address-of, prefix) — see "pointers" above
+- `*<expression>` (dereference, prefix) — see "pointers" above
 
 Precedence, loosest to tightest: `||`, then `&&`, then `!`, then the
 comparison operators, then `+`/`-` (addition/subtraction), then `*`/`/`
-(multiplication/division), then unary `-`, then primaries
-(literals/identifiers/`input`/parenthesized expressions). `!` applies to
-the entire comparison that follows it (`!a == b` means `!(a == b)`, not
-`(!a) == b`). Parentheses group any expression and can be nested, e.g.
-`(2 + 3) * 4` evaluates to `20`.
+(multiplication/division), then unary `-`/`*` (negation/dereference, same
+tier), then primaries (literals/identifiers/`input`/parenthesized
+expressions/`&<VARIABLE>`). `!` applies to the entire comparison that
+follows it (`!a == b` means `!(a == b)`, not `(!a) == b`). Parentheses
+group any expression and can be nested, e.g. `(2 + 3) * 4` evaluates to
+`20`. Prefix `*` (dereference) is unambiguous with infix `*`
+(multiplication) — the parser only ever reads a prefix `*` where an
+operand is expected, so `*p + 1` dereferences `p` first, and `a * b`
+multiplies as usual.
 
 `+`, `-`, `*`, `/` are not statically type-checked against the variable
 they're assigned to beyond requiring an `int` or `float` target — whether
@@ -507,12 +560,13 @@ program        := mention* classDecl+
 mention        := "@" "mentions" filename "->" IDENTIFIER ";"
 filename       := IDENTIFIER ("." IDENTIFIER)*
 classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
-statement      := printStmt | varDecl | assignment | compoundAssign | ifStmt
-                  | whileStmt | forStmt | tryStmt | throwStmt | exprStmt | callStmt
+statement      := printStmt | varDecl | assignment | derefAssign | compoundAssign
+                  | ifStmt | whileStmt | forStmt | tryStmt | throwStmt | exprStmt | callStmt
 callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
 assignment     := IDENTIFIER "=" expression ";"
+derefAssign    := "*" IDENTIFIER "=" expression ";"
 compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") expression ";"
 ifStmt         := "if" "(" expression ")" block ";"?
                   ("elseif" "(" expression ")" block ";"?)*
@@ -524,15 +578,15 @@ tryStmt        := "try" block "catch" "(" IDENTIFIER ":" "str" ")" block ";"?
 throwStmt      := "throw" expression ";"
 exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")"
 block          := "{" statement* "}"
-type           := "int" | "str" | "float" | "bool"
+type           := "int" | "str" | "float" | "bool" | "ptr" "<" ("int" | "str" | "float" | "bool") ">"
 expression     := or
 or             := and ("||" and)*
 and            := not ("&&" not)*
 not            := "!" not | comparison
 comparison     := additive (("==" | "!=" | "<" | "<=" | ">" | ">=") additive)?
 additive       := multiplicative (("+" | "-") multiplicative)*
-multiplicative := unaryMinus (("*" | "/") unaryMinus)*
-unaryMinus     := "-" unaryMinus | primary
+multiplicative := unaryPrefix (("*" | "/") unaryPrefix)*
+unaryPrefix    := "-" unaryPrefix | "*" unaryPrefix | "&" IDENTIFIER | primary
 primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER parseCall? | inputCall | "(" expression ")"
 parseCall      := "." "parse" "(" type ")"
 inputCall      := "input" "(" STRING ")"
@@ -553,3 +607,6 @@ time, not parse time) if it's the file actually being compiled/run.
 - Quoted/path-style `@mentions` filenames (e.g. subdirectories) — the filename is a bare dotted identifier sequence, so it must look like a valid identifier chain (`utils.el`, not `"../lib/utils.el"`)
 - `finally` blocks
 - Custom/typed exceptions — every thrown or built-in error is just a `str` message; there's no error "kind" to distinguish or match on beyond the message text itself
+- Pointer-to-pointer (`ptr<ptr<...>>`)
+- Compound assignment through a pointer (`*p += 1;`) — use `*p = *p + 1;` instead
+- Pointers into `for`-loop init/update clauses (`for (...; ...; *p = *p + 1) {}`)
