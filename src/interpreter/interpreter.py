@@ -1,5 +1,6 @@
 from nodes.nodes import (
     AddressOf,
+    AppendCall,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -11,8 +12,13 @@ from nodes.nodes import (
     ForStatement,
     Identifier,
     IfStatement,
+    IndexAssignment,
+    IndexExpr,
     InputCall,
     IntLiteral,
+    LengthCall,
+    ListDecl,
+    ListLiteral,
     ParseCall,
     PrintStatement,
     StringLiteral,
@@ -24,7 +30,7 @@ from nodes.nodes import (
 )
 from linker.linker import ResolvedProgram
 from utils.errors import EvansLangError
-from utils.runtime import Cell, display, parse_as
+from utils.runtime import Cell, EvList, check_element_type, display, parse_as
 
 
 # Lower than the VM's limit: the interpreter uses native Python recursion
@@ -69,6 +75,24 @@ class Interpreter:
             # assignment still observes the new value afterward.
             cell.value = value
 
+    def _index(self, target, index):
+        if not isinstance(target, list):
+            raise EvansLangError("Cannot index a non-list value")
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise EvansLangError(f"List index must be an int, got {type(index).__name__}")
+        if index < 0 or index >= len(target):
+            raise EvansLangError(f"List index {index} out of range (length {len(target)})")
+        return target[index]
+
+    def _index_set(self, target, index, value) -> None:
+        if not isinstance(target, list):
+            raise EvansLangError("Cannot index a non-list value")
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise EvansLangError(f"List index must be an int, got {type(index).__name__}")
+        if index < 0 or index >= len(target):
+            raise EvansLangError(f"List index {index} out of range (length {len(target)})")
+        target[index] = value
+
     def _execute(self, node):
         if isinstance(node, CallStatement):
             # resolved_target is computed by the linker, using the alias
@@ -94,6 +118,19 @@ class Interpreter:
             if not isinstance(cell, Cell):
                 raise EvansLangError("Cannot dereference a non-pointer value")
             cell.value = self._evaluate(node.value)
+            return
+        if isinstance(node, ListDecl):
+            self._store(
+                node.name,
+                self._evaluate(ListLiteral(node.elements, node.element_type)),
+            )
+            return
+        if isinstance(node, IndexAssignment):
+            target = self._evaluate(node.target)
+            index = self._evaluate(node.index)
+            value = self._evaluate(node.value)
+            check_element_type(target, value, "assign")
+            self._index_set(target, index, value)
             return
         if isinstance(node, IfStatement):
             if self._evaluate(node.condition):
@@ -166,6 +203,28 @@ class Interpreter:
             if not isinstance(cell, Cell):
                 raise EvansLangError("Cannot dereference a non-pointer value")
             return cell.value
+        if isinstance(node, ListLiteral):
+            return EvList(
+                (self._evaluate(element) for element in node.elements),
+                node.element_type,
+            )
+        if isinstance(node, IndexExpr):
+            target = self._evaluate(node.target)
+            index = self._evaluate(node.index)
+            return self._index(target, index)
+        if isinstance(node, AppendCall):
+            target = self._evaluate(node.target)
+            if not isinstance(target, list):
+                raise EvansLangError("Cannot call .append on a non-list value")
+            value = self._evaluate(node.value)
+            check_element_type(target, value, "append")
+            target.append(value)
+            return value
+        if isinstance(node, LengthCall):
+            target = self._evaluate(node.target)
+            if not isinstance(target, list):
+                raise EvansLangError("Cannot call .length on a non-list value")
+            return len(target)
         if isinstance(node, InputCall):
             return input(self._evaluate(node.prompt))
         if isinstance(node, ParseCall):

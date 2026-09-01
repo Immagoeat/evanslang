@@ -43,6 +43,18 @@ class Lexer:
             self._advance()
             return Token(TokenType.RBRACE, "}", line, column)
 
+        if char == "[":
+            self._advance()
+            return Token(TokenType.LBRACKET, "[", line, column)
+
+        if char == "]":
+            self._advance()
+            return Token(TokenType.RBRACKET, "]", line, column)
+
+        if char == ",":
+            self._advance()
+            return Token(TokenType.COMMA, ",", line, column)
+
         if char == ";":
             self._advance()
             return Token(TokenType.SEMICOLON, ";", line, column)

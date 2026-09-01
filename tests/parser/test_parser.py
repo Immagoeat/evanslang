@@ -7,6 +7,7 @@ import pytest
 
 from nodes.nodes import (
     AddressOf,
+    AppendCall,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -18,8 +19,12 @@ from nodes.nodes import (
     ForStatement,
     Identifier,
     IfStatement,
+    IndexAssignment,
+    IndexExpr,
     InputCall,
     IntLiteral,
+    LengthCall,
+    ListDecl,
     ParseCall,
     PrintStatement,
     StringLiteral,
@@ -721,3 +726,103 @@ def test_rejects_unknown_pointee_type():
 def test_rejects_non_pointer_value_assigned_to_ptr_variable():
     with pytest.raises(ParseError):
         parse_program("var x: int = 5;\nvar p: ptr<int> = 5;")
+
+
+def test_parses_empty_list_decl():
+    statements = parse_program("list nums;")
+
+    decl = statements[0]
+    assert isinstance(decl, ListDecl)
+    assert decl.element_type is None
+    assert decl.elements == []
+
+
+def test_parses_untyped_list_with_mixed_elements():
+    statements = parse_program('list mixed: [1, "two", true];')
+
+    decl = statements[0]
+    assert isinstance(decl, ListDecl)
+    assert decl.element_type is None
+    assert len(decl.elements) == 3
+    assert isinstance(decl.elements[0], IntLiteral)
+    assert isinstance(decl.elements[1], StringLiteral)
+    assert isinstance(decl.elements[2], BoolLiteral)
+
+
+def test_parses_typed_list_decl():
+    statements = parse_program("list<int> nums: [1, 2, 3];")
+
+    decl = statements[0]
+    assert isinstance(decl, ListDecl)
+    assert decl.element_type == "int"
+    assert len(decl.elements) == 3
+
+
+def test_rejects_typed_list_with_mismatched_literal():
+    with pytest.raises(ParseError):
+        parse_program('list<int> nums: [1, "two"];')
+
+
+def test_parses_list_index_expression():
+    statements = parse_program("list nums: [1, 2, 3];\nprint(nums[0]);")
+
+    print_stmt = statements[1]
+    assert isinstance(print_stmt.argument, IndexExpr)
+    assert isinstance(print_stmt.argument.target, Identifier)
+    assert print_stmt.argument.target.name == "nums"
+    assert isinstance(print_stmt.argument.index, IntLiteral)
+
+
+def test_parses_list_index_assignment():
+    statements = parse_program("list nums: [1, 2, 3];\nnums[0] = 5;")
+
+    assign = statements[1]
+    assert isinstance(assign, IndexAssignment)
+    assert isinstance(assign.target, Identifier)
+    assert assign.target.name == "nums"
+    assert isinstance(assign.value, IntLiteral)
+    assert assign.value.value == 5
+
+
+def test_rejects_typed_list_index_assignment_with_mismatched_literal():
+    with pytest.raises(ParseError):
+        parse_program('list<int> nums: [1, 2, 3];\nnums[0] = "bad";')
+
+
+def test_parses_append_call():
+    statements = parse_program("list nums: [1, 2];\nnums.append(3);")
+
+    append_stmt = statements[1]
+    assert isinstance(append_stmt, ExpressionStatement)
+    assert isinstance(append_stmt.expression, AppendCall)
+    assert isinstance(append_stmt.expression.value, IntLiteral)
+    assert append_stmt.expression.value.value == 3
+
+
+def test_rejects_typed_list_append_with_mismatched_literal():
+    with pytest.raises(ParseError):
+        parse_program('list<int> nums: [1, 2];\nnums.append("bad");')
+
+
+def test_parses_length_call():
+    statements = parse_program("list nums: [1, 2];\nprint(nums.length());")
+
+    print_stmt = statements[1]
+    assert isinstance(print_stmt.argument, LengthCall)
+    assert isinstance(print_stmt.argument.target, Identifier)
+    assert print_stmt.argument.target.name == "nums"
+
+
+def test_rejects_indexing_a_non_list_variable():
+    with pytest.raises(ParseError):
+        parse_program("var x: int = 5;\nprint(x[0]);")
+
+
+def test_rejects_append_on_a_non_list_variable():
+    with pytest.raises(ParseError):
+        parse_program("var x: int = 5;\nx.append(1);")
+
+
+def test_rejects_length_on_a_non_list_variable():
+    with pytest.raises(ParseError):
+        parse_program("var x: int = 5;\nprint(x.length());")

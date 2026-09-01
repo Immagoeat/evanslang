@@ -281,3 +281,119 @@ def test_dereferencing_through_a_thrown_and_caught_error_still_works():
         "}"
     )
     assert lines == ["Cannot apply '+' to int and str", "5"]
+
+
+def test_list_index_read_and_write():
+    lines = build_run_capture(
+        'class main() {\n'
+        "list nums: [1, 2, 3];\n"
+        "print(nums[1]);\n"
+        "nums[1] = 99;\n"
+        "print(nums[1]);\n"
+        "}"
+    )
+    assert lines == ["2", "99"]
+
+
+def test_list_append_and_length():
+    lines = build_run_capture(
+        'class main() {\n'
+        "list nums: [1, 2];\n"
+        "print(nums.length());\n"
+        "nums.append(3);\n"
+        "print(nums.length());\n"
+        "print(nums[2]);\n"
+        "}"
+    )
+    assert lines == ["2", "3", "3"]
+
+
+def test_empty_list_decl_starts_empty():
+    lines = build_run_capture(
+        'class main() {\n'
+        "list nums;\n"
+        "print(nums.length());\n"
+        "nums.append(1);\n"
+        "print(nums.length());\n"
+        "}"
+    )
+    assert lines == ["0", "1"]
+
+
+def test_untyped_list_allows_mixed_types():
+    lines = build_run_capture(
+        'class main() {\n'
+        'list mixed: [1, "two", true];\n'
+        "print(mixed);\n"
+        "}"
+    )
+    assert lines == ['[1, "two", true]']
+
+
+def test_list_index_out_of_range_raises_clean_error():
+    with pytest.raises(EvansLangError):
+        build_and_run(
+            'class main() {\n'
+            "list nums: [1, 2];\n"
+            "print(nums[5]);\n"
+            "}"
+        )
+
+
+def test_indexing_a_non_list_raises_clean_error():
+    with pytest.raises(EvansLangError):
+        build_and_run(
+            'class main() {\n'
+            "var x: int = 5;\n"
+            "print(x[0]);\n"
+            "}"
+        )
+
+
+def test_typed_list_rejects_runtime_type_mismatch_on_append():
+    with pytest.raises(EvansLangError):
+        build_and_run(
+            'class main() {\n'
+            "list<int> nums: [1, 2];\n"
+            'var s: str = "oops";\n'
+            "nums.append(s);\n"
+            "}"
+        )
+
+
+def test_typed_list_rejects_runtime_type_mismatch_on_index_assignment():
+    with pytest.raises(EvansLangError):
+        build_and_run(
+            'class main() {\n'
+            "list<int> nums: [1, 2];\n"
+            'var s: str = "oops";\n'
+            "nums[0] = s;\n"
+            "}"
+        )
+
+
+def test_list_index_error_is_catchable():
+    lines = build_run_capture(
+        'class main() {\n'
+        "list nums: [1, 2];\n"
+        "try {\n"
+        "print(nums[5]);\n"
+        "}\n"
+        'catch (e: str) {\nprint(e);\n}\n'
+        "}"
+    )
+    assert lines == ["List index 5 out of range (length 2)"]
+
+
+def test_list_used_in_for_loop():
+    lines = build_run_capture(
+        'class main() {\n'
+        "list nums: [1, 2, 3, 4];\n"
+        "var sum: int = 0;\n"
+        "for (var i: int = 0; i < nums.length(); i += 1) {\n"
+        "sum = sum + nums[i];\n"
+        "}\n"
+        "print(sum);\n"
+        "}"
+    )
+    assert lines == ["10"]

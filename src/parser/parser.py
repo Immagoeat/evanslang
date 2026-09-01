@@ -1,5 +1,6 @@
 from nodes.nodes import (
     AddressOf,
+    AppendCall,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -12,8 +13,13 @@ from nodes.nodes import (
     ForStatement,
     Identifier,
     IfStatement,
+    IndexAssignment,
+    IndexExpr,
     InputCall,
     IntLiteral,
+    LengthCall,
+    ListDecl,
+    ListLiteral,
     Mention,
     ParseCall,
     PrintStatement,
@@ -30,7 +36,14 @@ from utils.errors import ParseError
 
 VALID_TYPES = {"int", "str", "float", "bool"}
 POINTABLE_TYPES = {"int", "str", "float", "bool"}
+LIST_ELEMENT_TYPES = {"int", "str", "float", "bool"}
 RESERVED_CLASS_NAMES = {"main", "init"}
+LITERAL_TYPES_BY_NAME = {
+    "int": IntLiteral,
+    "str": StringLiteral,
+    "float": FloatLiteral,
+    "bool": BoolLiteral,
+}
 
 COMPOUND_OPERATORS = {
     TokenType.PLUS_EQUALS: "+",
@@ -54,6 +67,11 @@ class Parser:
         self.tokens = tokens
         self.pos = 0
         self.declared_types: dict[str, str] = {}
+        # Separate from declared_types (which stores "list"/"list<int>" as
+        # a single string like every other type) because .append(...)/
+        # list[i] = ...; need just the element type name on its own to
+        # look up LITERAL_TYPES_BY_NAME - None here means an untyped list.
+        self.list_element_types: dict[str, str | None] = {}
         self.class_names: set[str] = set()
         self.mention_aliases: set[str] = set()
 
@@ -163,6 +181,8 @@ class Parser:
             return self._parse_print_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "var":
             return self._parse_var_decl()
+        if token.type == TokenType.IDENTIFIER and token.value == "list":
+            return self._parse_list_decl()
         if token.type == TokenType.IDENTIFIER and token.value == "if":
             return self._parse_if_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "while":
@@ -179,6 +199,8 @@ class Parser:
             return self._parse_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type in COMPOUND_OPERATORS:
             return self._parse_compound_assignment()
+        if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.LBRACKET:
+            return self._parse_index_assignment()
         if (
             token.type == TokenType.IDENTIFIER
             and self._peek(1).type == TokenType.DOT
@@ -277,6 +299,100 @@ class Parser:
         self._check_type(name_token, type_name, value)
 
         return VarDecl(name_token.value, type_name, value)
+
+    def _parse_list_decl(self, consume_semicolon: bool = True) -> ListDecl:
+        self._expect(TokenType.IDENTIFIER, "list")
+        element_type: str | None = None
+        if self._peek().type == TokenType.LESS:
+            self._advance()
+            type_token = self._expect(TokenType.IDENTIFIER)
+            if type_token.value not in LIST_ELEMENT_TYPES:
+                raise ParseError(
+                    f"Unknown type {type_token.value!r} in list<...>",
+                    type_token.line,
+                    type_token.column,
+                )
+            self._expect(TokenType.GREATER)
+            element_type = type_token.value
+
+        name_token = self._expect(TokenType.IDENTIFIER)
+        self.declared_types[name_token.value] = (
+            f"list<{element_type}>" if element_type else "list"
+        )
+        self.list_element_types[name_token.value] = element_type
+
+        if self._peek().type == TokenType.SEMICOLON:
+            # list NAME; with no initializer - sugar for an empty list,
+            # immediately usable with .append(...)/indexing, unlike a bare
+            # `var NAME: type;` which has no storage until first assigned.
+            if consume_semicolon:
+                self._advance()
+            return ListDecl(name_token.value, element_type, [])
+
+        self._expect(TokenType.COLON)
+        elements = self._parse_list_literal_elements()
+        if consume_semicolon:
+            self._expect(TokenType.SEMICOLON)
+
+        if element_type is not None:
+            expected_literal = LITERAL_TYPES_BY_NAME[element_type]
+            for element in elements:
+                if not isinstance(element, expected_literal):
+                    raise ParseError(
+                        f"Cannot include a non-{element_type} literal in "
+                        f"list<{element_type}> {name_token.value!r}",
+                        name_token.line,
+                        name_token.column,
+                    )
+
+        return ListDecl(name_token.value, element_type, elements)
+
+    def _parse_list_literal_elements(self) -> list:
+        self._expect(TokenType.LBRACKET)
+        elements = []
+        if self._peek().type != TokenType.RBRACKET:
+            elements.append(self._parse_expression())
+            while self._peek().type == TokenType.COMMA:
+                self._advance()
+                elements.append(self._parse_expression())
+        self._expect(TokenType.RBRACKET)
+        return elements
+
+    def _parse_index_assignment(self, consume_semicolon: bool = True) -> IndexAssignment:
+        name_token = self._expect(TokenType.IDENTIFIER)
+        self._require_list(name_token)
+        self._expect(TokenType.LBRACKET)
+        index = self._parse_expression()
+        self._expect(TokenType.RBRACKET)
+        self._expect(TokenType.EQUALS)
+        value = self._parse_expression()
+        if consume_semicolon:
+            self._expect(TokenType.SEMICOLON)
+
+        element_type = self.list_element_types.get(name_token.value)
+        if element_type is not None:
+            expected_literal = LITERAL_TYPES_BY_NAME[element_type]
+            if isinstance(value, tuple(LITERAL_TYPES_BY_NAME.values())) and not isinstance(
+                value, expected_literal
+            ):
+                raise ParseError(
+                    f"Cannot assign a non-{element_type} value into "
+                    f"list<{element_type}> {name_token.value!r}",
+                    name_token.line,
+                    name_token.column,
+                )
+
+        return IndexAssignment(Identifier(name_token.value), index, value)
+
+    def _require_list(self, name_token: Token) -> None:
+        declared = self.declared_types.get(name_token.value)
+        if declared is None or not (declared == "list" or declared.startswith("list<")):
+            raise ParseError(
+                f"{name_token.value!r} is not a declared list "
+                f"(declared {declared or 'nothing'!r})",
+                name_token.line,
+                name_token.column,
+            )
 
     def _parse_if_statement(self) -> IfStatement:
         self._expect(TokenType.IDENTIFIER, "if")
@@ -710,26 +826,61 @@ class Parser:
         if token.type == TokenType.IDENTIFIER:
             self._advance()
             target = Identifier(token.value)
+            if self._peek().type == TokenType.LBRACKET:
+                self._require_list(token)
+                self._advance()
+                index = self._parse_expression()
+                self._expect(TokenType.RBRACKET)
+                return IndexExpr(target, index)
             if self._peek().type == TokenType.DOT:
                 self._advance()
-                self._expect(TokenType.IDENTIFIER, "parse")
-                source_type = self.declared_types.get(target.name)
-                if source_type != "str":
-                    raise ParseError(
-                        f"Cannot call .parse on {source_type or 'undeclared'} variable {target.name!r} (expected 'str')",
-                        token.line,
-                        token.column,
-                    )
-                self._expect(TokenType.LPAREN)
-                type_token = self._expect(TokenType.IDENTIFIER)
-                if type_token.value not in VALID_TYPES:
-                    raise ParseError(
-                        f"Unknown type {type_token.value!r} in .parse(...)",
-                        type_token.line,
-                        type_token.column,
-                    )
-                self._expect(TokenType.RPAREN)
-                return ParseCall(target, type_token.value)
+                method_token = self._expect(TokenType.IDENTIFIER)
+                if method_token.value == "parse":
+                    source_type = self.declared_types.get(target.name)
+                    if source_type != "str":
+                        raise ParseError(
+                            f"Cannot call .parse on {source_type or 'undeclared'} variable {target.name!r} (expected 'str')",
+                            token.line,
+                            token.column,
+                        )
+                    self._expect(TokenType.LPAREN)
+                    type_token = self._expect(TokenType.IDENTIFIER)
+                    if type_token.value not in VALID_TYPES:
+                        raise ParseError(
+                            f"Unknown type {type_token.value!r} in .parse(...)",
+                            type_token.line,
+                            type_token.column,
+                        )
+                    self._expect(TokenType.RPAREN)
+                    return ParseCall(target, type_token.value)
+                if method_token.value == "append":
+                    self._require_list(token)
+                    self._expect(TokenType.LPAREN)
+                    value = self._parse_expression()
+                    self._expect(TokenType.RPAREN)
+                    element_type = self.list_element_types.get(target.name)
+                    if element_type is not None:
+                        expected_literal = LITERAL_TYPES_BY_NAME[element_type]
+                        if isinstance(
+                            value, tuple(LITERAL_TYPES_BY_NAME.values())
+                        ) and not isinstance(value, expected_literal):
+                            raise ParseError(
+                                f"Cannot append a non-{element_type} value to "
+                                f"list<{element_type}> {target.name!r}",
+                                token.line,
+                                token.column,
+                            )
+                    return AppendCall(target, value)
+                if method_token.value == "length":
+                    self._require_list(token)
+                    self._expect(TokenType.LPAREN)
+                    self._expect(TokenType.RPAREN)
+                    return LengthCall(target)
+                raise ParseError(
+                    f"Unknown method {method_token.value!r}",
+                    method_token.line,
+                    method_token.column,
+                )
             return target
         raise ParseError(
             f"Expected an expression but got {token.value!r}",

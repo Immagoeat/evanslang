@@ -33,6 +33,11 @@ class OpCode(Enum):
     ADDR_OF = auto()
     DEREF = auto()
     DEREF_STORE = auto()
+    LIST_NEW = auto()
+    INDEX_GET = auto()
+    INDEX_SET = auto()
+    LIST_APPEND = auto()
+    LIST_LEN = auto()
     HALT = auto()
 
 

@@ -1,7 +1,7 @@
 from ir.ir import OpCode
 from ir.ir import Program as IrProgram
 from utils.errors import EvansLangError
-from utils.runtime import Cell, display, parse_as
+from utils.runtime import Cell, EvList, check_element_type, display, parse_as
 
 
 MAX_CALL_DEPTH = 1000
@@ -74,6 +74,34 @@ class VM:
             if not isinstance(cell, Cell):
                 raise EvansLangError("Cannot dereference a non-pointer value")
             cell.value = value
+        elif instruction.opcode == OpCode.LIST_NEW:
+            count, element_type = instruction.operand
+            elements = self.stack[len(self.stack) - count :] if count else []
+            del self.stack[len(self.stack) - count :]
+            self.stack.append(EvList(elements, element_type))
+        elif instruction.opcode == OpCode.INDEX_GET:
+            index = self.stack.pop()
+            target = self.stack.pop()
+            self.stack.append(self._index(target, index))
+        elif instruction.opcode == OpCode.INDEX_SET:
+            value = self.stack.pop()
+            index = self.stack.pop()
+            target = self.stack.pop()
+            check_element_type(target, value, "assign")
+            self._index_set(target, index, value)
+        elif instruction.opcode == OpCode.LIST_APPEND:
+            value = self.stack.pop()
+            target = self.stack.pop()
+            if not isinstance(target, list):
+                raise EvansLangError("Cannot call .append on a non-list value")
+            check_element_type(target, value, "append")
+            target.append(value)
+            self.stack.append(value)
+        elif instruction.opcode == OpCode.LIST_LEN:
+            target = self.stack.pop()
+            if not isinstance(target, list):
+                raise EvansLangError("Cannot call .length on a non-list value")
+            self.stack.append(len(target))
         elif instruction.opcode == OpCode.INPUT:
             prompt = self.stack.pop()
             self.stack.append(input(prompt))
@@ -210,3 +238,21 @@ class VM:
             raise EvansLangError(
                 f"Cannot apply {operator!r} to {type(left).__name__} and {type(right).__name__}"
             )
+
+    def _index(self, target, index):
+        if not isinstance(target, list):
+            raise EvansLangError("Cannot index a non-list value")
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise EvansLangError(f"List index must be an int, got {type(index).__name__}")
+        if index < 0 or index >= len(target):
+            raise EvansLangError(f"List index {index} out of range (length {len(target)})")
+        return target[index]
+
+    def _index_set(self, target, index, value) -> None:
+        if not isinstance(target, list):
+            raise EvansLangError("Cannot index a non-list value")
+        if not isinstance(index, int) or isinstance(index, bool):
+            raise EvansLangError(f"List index must be an int, got {type(index).__name__}")
+        if index < 0 or index >= len(target):
+            raise EvansLangError(f"List index {index} out of range (length {len(target)})")
+        target[index] = value

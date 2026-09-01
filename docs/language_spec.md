@@ -418,6 +418,55 @@ supported yet — use `*<NAME> = *<NAME> + <expression>;` instead.
 `print(<pointer>)` (printing the pointer itself, not `*<pointer>`) prints
 an opaque `ptr@<address>` marker rather than the pointee's value.
 
+### lists
+
+```
+list <NAME>;
+list <NAME>: [<expression>, <expression>, ...];
+list<type> <NAME>: [<expression>, <expression>, ...];
+```
+
+`list <NAME>;` declares an empty list — unlike `var NAME: type;`, it's
+immediately usable (`.append(...)`, indexing) rather than having no
+storage until first assigned. `list <NAME>: [...];` declares a list with
+initial elements; without a `<type>`, elements can be any mix of `int`,
+`str`, `float`, `bool` (and later assignments/appends accept anything
+too). `list<type> <NAME>: [...];` opts into type-checking: every literal
+in the initializer must be `<type>` (checked at parse time), and every
+later `.append(...)`/index-assignment is checked at runtime, raising a
+clean runtime error on a mismatch.
+
+```
+list nums: [1, 2, 3];
+print(nums[0]);        # 1
+nums[0] = 99;
+print(nums);            # [99, 2, 3]
+nums.append(4);
+print(nums.length());   # 4
+
+list<int> typed: [1, 2, 3];
+typed.append("bad");    # runtime error: wrong element type
+```
+
+- `<NAME>[<expression>]` — read an element by position (0-indexed). Out of
+  range, or a non-`int` index, is a runtime error.
+- `<NAME>[<expression>] = <expression>;` — write an element by position.
+  Same range/index-type checks as reading.
+- `<NAME>.append(<expression>)` — add an element at the end. Usable as an
+  expression (it evaluates to the appended value) or as a bare statement.
+- `<NAME>.length()` — the number of elements, as an `int`.
+
+Both `.append(...)`/`.length()` and indexing are only valid on a
+previously-declared `list` — using them on a non-list variable, or a
+declared `list` on a non-`list` variable, is a parse-time error where the
+target is a plain identifier (the common case); an index/element-type
+mismatch that can't be seen at parse time (e.g. through a non-literal
+expression) is instead a runtime error, the same as arithmetic/pointer
+type checks elsewhere. `print(<list>)` prints every element
+comma-separated inside `[...]`, with `str` elements quoted (`["a", 1,
+true]`) so they're distinguishable from other element types in the
+output.
+
 ### comments
 
 ```
@@ -443,12 +492,14 @@ print(bob);
 | `float` | Decimal numbers (requires a digit on both sides of the `.`) | `3.14` |
 | `bool`  | `true` or `false`                       | `true`           |
 | `ptr<type>` | A pointer to an `int`/`str`/`float`/`bool` variable | `&x` |
+| `list` / `list<type>` | An ordered, mutable collection — `list` allows mixed element types, `list<type>` restricts to one | `[1, 2, 3]` |
 
 `int` and `float` are always distinct — an `int` variable can never hold a
 `float` value or vice versa, in `var`, plain assignment, or compound
 assignment. There's no automatic widening (e.g. `int` → `float`).
 `ptr<type>` is itself a distinct type per pointee `type` (`ptr<int>` and
-`ptr<str>` don't mix) — see "pointers" above.
+`ptr<str>` don't mix) — see "pointers" above. `list`/`list<type>` are
+declared with their own `list` statement, not `var` — see "lists" above.
 
 ## Expressions
 
@@ -468,6 +519,8 @@ Currently supported expressions:
 - Parenthesized expressions: `(<expression>)`, to override precedence
 - `&<VARIABLE>` (address-of, prefix) — see "pointers" above
 - `*<expression>` (dereference, prefix) — see "pointers" above
+- `<NAME>[<expression>]` (list indexing), `<NAME>.append(<expression>)`,
+  `<NAME>.length()` — see "lists" above
 
 Precedence, loosest to tightest: `||`, then `&&`, then `!`, then the
 comparison operators, then `+`/`-` (addition/subtraction), then `*`/`/`
@@ -560,13 +613,18 @@ program        := mention* classDecl+
 mention        := "@" "mentions" filename "->" IDENTIFIER ";"
 filename       := IDENTIFIER ("." IDENTIFIER)*
 classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
-statement      := printStmt | varDecl | assignment | derefAssign | compoundAssign
-                  | ifStmt | whileStmt | forStmt | tryStmt | throwStmt | exprStmt | callStmt
+statement      := printStmt | varDecl | listDecl | assignment | derefAssign
+                  | indexAssign | compoundAssign | ifStmt | whileStmt | forStmt
+                  | tryStmt | throwStmt | exprStmt | callStmt
 callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
+listDecl       := "list" ("<" elementType ">")? IDENTIFIER (":" listLiteral)? ";"
+listLiteral    := "[" (expression ("," expression)*)? "]"
+elementType    := "int" | "str" | "float" | "bool"
 assignment     := IDENTIFIER "=" expression ";"
 derefAssign    := "*" IDENTIFIER "=" expression ";"
+indexAssign    := IDENTIFIER "[" expression "]" "=" expression ";"
 compoundAssign := IDENTIFIER ("+=" | "-=" | "*=" | "/=") expression ";"
 ifStmt         := "if" "(" expression ")" block ";"?
                   ("elseif" "(" expression ")" block ";"?)*
@@ -576,7 +634,7 @@ forStmt        := "for" "(" forClause? ";" expression? ";" forClause? ")" block 
 forClause      := varDecl' | assignment' | compoundAssign'   # same forms, no trailing ";"
 tryStmt        := "try" block "catch" "(" IDENTIFIER ":" "str" ")" block ";"?
 throwStmt      := "throw" expression ";"
-exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")"
+exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")" | ".append" "(" expression ")"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool" | "ptr" "<" ("int" | "str" | "float" | "bool") ">"
 expression     := or
@@ -587,8 +645,13 @@ comparison     := additive (("==" | "!=" | "<" | "<=" | ">" | ">=") additive)?
 additive       := multiplicative (("+" | "-") multiplicative)*
 multiplicative := unaryPrefix (("*" | "/") unaryPrefix)*
 unaryPrefix    := "-" unaryPrefix | "*" unaryPrefix | "&" IDENTIFIER | primary
-primary        := STRING | INT | FLOAT | "true" | "false" | IDENTIFIER parseCall? | inputCall | "(" expression ")"
+primary        := STRING | INT | FLOAT | "true" | "false"
+                  | IDENTIFIER (parseCall | appendCall | lengthCall | indexExpr)?
+                  | inputCall | "(" expression ")"
 parseCall      := "." "parse" "(" type ")"
+appendCall     := "." "append" "(" expression ")"
+lengthCall     := "." "length" "(" ")"
+indexExpr      := "[" expression "]"
 inputCall      := "input" "(" STRING ")"
 ```
 
@@ -610,3 +673,7 @@ time, not parse time) if it's the file actually being compiled/run.
 - Pointer-to-pointer (`ptr<ptr<...>>`)
 - Compound assignment through a pointer (`*p += 1;`) — use `*p = *p + 1;` instead
 - Pointers into `for`-loop init/update clauses (`for (...; ...; *p = *p + 1) {}`)
+- Lists of lists (nested lists), lists of pointers, or `ptr<list>`
+- Removing/inserting elements (`.pop()`, `.remove(...)`, `.insert(...)`) — only `.append(...)` exists so far
+- List literals/`[i]` indexing/`.append`/`.length` inside `for`-loop init/update clauses, or as a `catch (e: str)` binding target
+- Negative list indices (`nums[-1]`) or slicing (`nums[1:3]`)

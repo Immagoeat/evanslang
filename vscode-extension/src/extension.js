@@ -1,6 +1,6 @@
 const vscode = require("vscode");
 
-const KEYWORDS = ["class", "var", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "ment", "mentions"];
+const KEYWORDS = ["class", "var", "list", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "ment", "mentions"];
 const TYPES = ["int", "str", "float", "bool", "ptr"];
 const BUILTINS = ["print", "input"];
 const BOOLEAN_LITERALS = ["true", "false"];
@@ -36,6 +36,16 @@ function builtinCompletions() {
   parseCall.detail = "<str variable>.parse(<type>)";
   parseCall.insertText = new vscode.SnippetString("parse(${1|int,float,bool,str|})");
   items.push(parseCall);
+
+  const appendCall = new vscode.CompletionItem("append", vscode.CompletionItemKind.Method);
+  appendCall.detail = "<list>.append(<expression>)";
+  appendCall.insertText = new vscode.SnippetString("append(${1:value})");
+  items.push(appendCall);
+
+  const lengthCall = new vscode.CompletionItem("length", vscode.CompletionItemKind.Method);
+  lengthCall.detail = "<list>.length()";
+  lengthCall.insertText = new vscode.SnippetString("length()");
+  items.push(lengthCall);
 
   return items;
 }
@@ -114,6 +124,20 @@ function snippetCompletions() {
   );
   ptrDecl.detail = "Pointer variable declaration";
   items.push(ptrDecl);
+
+  const listDecl = new vscode.CompletionItem("list", vscode.CompletionItemKind.Snippet);
+  listDecl.insertText = new vscode.SnippetString(
+    "list ${1:name}: [${2:item1}, ${3:item2}];"
+  );
+  listDecl.detail = "List declaration";
+  items.push(listDecl);
+
+  const typedListDecl = new vscode.CompletionItem("list<type>", vscode.CompletionItemKind.Snippet);
+  typedListDecl.insertText = new vscode.SnippetString(
+    "list<${1|int,str,float,bool|}> ${2:name}: [${3:item1}, ${4:item2}];"
+  );
+  typedListDecl.detail = "Typed list declaration";
+  items.push(typedListDecl);
 
   return items;
 }

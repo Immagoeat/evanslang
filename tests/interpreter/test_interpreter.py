@@ -51,3 +51,16 @@ def test_dereferencing_a_caught_error_variable_works():
         "}"
     )
     assert lines == ["boom"]
+
+
+def test_list_index_and_append_match_vm_behavior():
+    lines = build_run_capture(
+        'class main() {\n'
+        "list nums: [1, 2, 3];\n"
+        "nums[0] = 9;\n"
+        "nums.append(4);\n"
+        "print(nums);\n"
+        "print(nums.length());\n"
+        "}"
+    )
+    assert lines == ["[9, 2, 3, 4]", "4"]

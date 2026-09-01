@@ -1,5 +1,6 @@
 from nodes.nodes import (
     AddressOf,
+    AppendCall,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -11,8 +12,13 @@ from nodes.nodes import (
     ForStatement,
     Identifier,
     IfStatement,
+    IndexAssignment,
+    IndexExpr,
     InputCall,
     IntLiteral,
+    LengthCall,
+    ListDecl,
+    ListLiteral,
     ParseCall,
     PrintStatement,
     StringLiteral,
@@ -125,6 +131,20 @@ class CodeGenerator:
                 *self._generate_expression(node.pointer),
                 *self._generate_expression(node.value),
                 Instruction(OpCode.DEREF_STORE),
+            ]
+        if isinstance(node, ListDecl):
+            return [
+                *self._generate_expression(
+                    ListLiteral(node.elements, node.element_type)
+                ),
+                Instruction(OpCode.STORE, node.name),
+            ]
+        if isinstance(node, IndexAssignment):
+            return [
+                *self._generate_expression(node.target),
+                *self._generate_expression(node.index),
+                *self._generate_expression(node.value),
+                Instruction(OpCode.INDEX_SET),
             ]
         if isinstance(node, IfStatement):
             return self._generate_if(node)
@@ -283,6 +303,33 @@ class CodeGenerator:
             return [
                 *self._generate_expression(node.operand),
                 Instruction(OpCode.DEREF),
+            ]
+        if isinstance(node, ListLiteral):
+            instructions: list[Instruction] = []
+            for element in node.elements:
+                instructions.extend(self._generate_expression(element))
+            instructions.append(
+                Instruction(
+                    OpCode.LIST_NEW, (len(node.elements), node.element_type)
+                )
+            )
+            return instructions
+        if isinstance(node, IndexExpr):
+            return [
+                *self._generate_expression(node.target),
+                *self._generate_expression(node.index),
+                Instruction(OpCode.INDEX_GET),
+            ]
+        if isinstance(node, AppendCall):
+            return [
+                *self._generate_expression(node.target),
+                *self._generate_expression(node.value),
+                Instruction(OpCode.LIST_APPEND),
+            ]
+        if isinstance(node, LengthCall):
+            return [
+                *self._generate_expression(node.target),
+                Instruction(OpCode.LIST_LEN),
             ]
         if isinstance(node, InputCall):
             return [

@@ -86,6 +86,64 @@ class DerefAssignment(Node):
         return f"DerefAssignment({self.pointer!r}, {self.value!r})"
 
 
+class ListLiteral(Node):
+    def __init__(self, elements: list[Node], element_type: str | None = None):
+        self.elements = elements
+        self.element_type = element_type
+
+    def __repr__(self):
+        return f"ListLiteral({self.elements!r}, element_type={self.element_type!r})"
+
+
+class ListDecl(Node):
+    def __init__(self, name: str, element_type: str | None, elements: list[Node]):
+        self.name = name
+        self.element_type = element_type
+        self.elements = elements
+
+    def __repr__(self):
+        return (
+            f"ListDecl({self.name!r}, element_type={self.element_type!r}, "
+            f"elements={self.elements!r})"
+        )
+
+
+class IndexExpr(Node):
+    def __init__(self, target: Node, index: Node):
+        self.target = target
+        self.index = index
+
+    def __repr__(self):
+        return f"IndexExpr({self.target!r}, {self.index!r})"
+
+
+class IndexAssignment(Node):
+    def __init__(self, target: Node, index: Node, value: Node):
+        self.target = target
+        self.index = index
+        self.value = value
+
+    def __repr__(self):
+        return f"IndexAssignment({self.target!r}, {self.index!r}, {self.value!r})"
+
+
+class AppendCall(Node):
+    def __init__(self, target: Node, value: Node):
+        self.target = target
+        self.value = value
+
+    def __repr__(self):
+        return f"AppendCall({self.target!r}, {self.value!r})"
+
+
+class LengthCall(Node):
+    def __init__(self, target: Node):
+        self.target = target
+
+    def __repr__(self):
+        return f"LengthCall({self.target!r})"
+
+
 class InputCall(Node):
     def __init__(self, prompt: Node):
         self.prompt = prompt
