@@ -1,4 +1,6 @@
 class main() {
+    # .parse(type) converts a str variable's value to another type at
+    # runtime - the target type must be given explicitly.
     var bob: str = "42";
     var n: int = bob.parse(int);
     print(n);

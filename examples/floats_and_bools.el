@@ -1,4 +1,5 @@
 class main() {
+    # float requires a digit on both sides of the "." (3.14, not .14 or 3.).
     var pi: float = 3.14;
     print(pi);
     pi += 1.0;
@@ -8,6 +9,8 @@ class main() {
     pi /= 4.0;
     print(pi);
 
+    # bool is either true or false; print() shows them lowercase,
+    # not Python-style True/False.
     var flag: bool = true;
     print(flag);
 

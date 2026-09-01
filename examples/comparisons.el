@@ -2,6 +2,7 @@ class main() {
     var n: int = 5;
     var m: int = 10;
 
+    # !=, <, >, <=, >= - the full set of comparison operators.
     if (n != m) {
         print("n and m differ");
     }
@@ -22,6 +23,7 @@ class main() {
         print("m is at least 10");
     }
 
+    # && and || do not short-circuit - both sides always run.
     if (n < m && m > 0) {
         print("both conditions true");
     }
@@ -30,6 +32,8 @@ class main() {
         print("at least one is true");
     }
 
+    # ! (not) applies to the whole comparison that follows it:
+    # !n == m means !(n == m), not (!n) == m.
     if (!n == m) {
         print("n is not equal to m");
     }
