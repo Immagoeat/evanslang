@@ -1,6 +1,7 @@
 from nodes.nodes import (
     AddressOf,
     AppendCall,
+    AsciiStatement,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -163,6 +164,11 @@ class CodeGenerator:
             return [
                 *self._generate_expression(node.expression),
                 Instruction(OpCode.THROW),
+            ]
+        if isinstance(node, AsciiStatement):
+            return [
+                *self._generate_expression(node.path),
+                Instruction(OpCode.ASCII),
             ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")
 

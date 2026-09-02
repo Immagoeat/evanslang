@@ -2,7 +2,7 @@ const vscode = require("vscode");
 
 const KEYWORDS = ["class", "var", "list", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "ment", "mentions"];
 const TYPES = ["int", "str", "float", "bool", "ptr"];
-const BUILTINS = ["print", "input"];
+const BUILTINS = ["print", "input", "ascii"];
 const BOOLEAN_LITERALS = ["true", "false"];
 
 function keywordCompletions() {
@@ -31,6 +31,11 @@ function builtinCompletions() {
   input.detail = 'input("<prompt>")';
   input.insertText = new vscode.SnippetString('input("${1:prompt}")');
   items.push(input);
+
+  const asciiStmt = new vscode.CompletionItem("ascii", vscode.CompletionItemKind.Function);
+  asciiStmt.detail = "ascii <expression>; - prints an image as ASCII art";
+  asciiStmt.insertText = new vscode.SnippetString('ascii "${1:image.png}";');
+  items.push(asciiStmt);
 
   const parseCall = new vscode.CompletionItem("parse", vscode.CompletionItemKind.Method);
   parseCall.detail = "<str variable>.parse(<type>)";

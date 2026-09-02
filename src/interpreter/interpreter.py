@@ -1,6 +1,7 @@
 from nodes.nodes import (
     AddressOf,
     AppendCall,
+    AsciiStatement,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -30,7 +31,14 @@ from nodes.nodes import (
 )
 from linker.linker import ResolvedProgram
 from utils.errors import EvansLangError
-from utils.runtime import Cell, EvList, check_element_type, display, parse_as
+from utils.runtime import (
+    Cell,
+    EvList,
+    check_element_type,
+    display,
+    parse_as,
+    render_ascii_art,
+)
 
 
 # Lower than the VM's limit: the interpreter uses native Python recursion
@@ -179,6 +187,14 @@ class Interpreter:
                     f"Cannot throw a {type(value).__name__} (expected str)"
                 )
             raise EvansLangError(value)
+        if isinstance(node, AsciiStatement):
+            path = self._evaluate(node.path)
+            if not isinstance(path, str):
+                raise EvansLangError(
+                    f"Cannot use a {type(path).__name__} as an ascii image path (expected str)"
+                )
+            print(render_ascii_art(path))
+            return
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 
     def _evaluate(self, node):

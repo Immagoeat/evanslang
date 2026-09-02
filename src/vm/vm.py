@@ -1,7 +1,14 @@
 from ir.ir import OpCode
 from ir.ir import Program as IrProgram
 from utils.errors import EvansLangError
-from utils.runtime import Cell, EvList, check_element_type, display, parse_as
+from utils.runtime import (
+    Cell,
+    EvList,
+    check_element_type,
+    display,
+    parse_as,
+    render_ascii_art,
+)
 
 
 MAX_CALL_DEPTH = 1000
@@ -203,6 +210,13 @@ class VM:
                     f"Cannot throw a {type(value).__name__} (expected str)"
                 )
             raise EvansLangError(value)
+        elif instruction.opcode == OpCode.ASCII:
+            path = self.stack.pop()
+            if not isinstance(path, str):
+                raise EvansLangError(
+                    f"Cannot use a {type(path).__name__} as an ascii image path (expected str)"
+                )
+            print(render_ascii_art(path))
         elif instruction.opcode == OpCode.HALT:
             return None
         else:

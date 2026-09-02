@@ -1,6 +1,7 @@
 from nodes.nodes import (
     AddressOf,
     AppendCall,
+    AsciiStatement,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -193,6 +194,8 @@ class Parser:
             return self._parse_try_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "throw":
             return self._parse_throw_statement()
+        if token.type == TokenType.IDENTIFIER and token.value == "ascii":
+            return self._parse_ascii_statement()
         if token.type == TokenType.STAR:
             return self._parse_deref_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
@@ -479,6 +482,12 @@ class Parser:
         expression = self._parse_expression()
         self._expect(TokenType.SEMICOLON)
         return ThrowStatement(expression)
+
+    def _parse_ascii_statement(self) -> AsciiStatement:
+        self._expect(TokenType.IDENTIFIER, "ascii")
+        path = self._parse_expression()
+        self._expect(TokenType.SEMICOLON)
+        return AsciiStatement(path)
 
     def _parse_for_clause_statement(self):
         # The init/update clauses of a for-header are statements without

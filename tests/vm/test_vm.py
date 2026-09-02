@@ -397,3 +397,65 @@ def test_list_used_in_for_loop():
         "}"
     )
     assert lines == ["10"]
+
+
+def _write_test_image(path) -> None:
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    # Half black, half white (not uniform) so every rendered row contains
+    # a real ramp character rather than an all-space row, which
+    # build_run_capture's blank-line filtering would otherwise drop.
+    image = Image.new("RGB", (10, 10), "white")
+    for y in range(5):
+        for x in range(10):
+            image.putpixel((x, y), (0, 0, 0))
+    image.save(path)
+
+
+def test_ascii_statement_prints_multiple_rows():
+    with tempfile.TemporaryDirectory() as tmp:
+        image_path = Path(tmp) / "test.png"
+        _write_test_image(image_path)
+        lines = build_run_capture(
+            'class main() {\n'
+            f'ascii "{image_path.as_posix()}";\n'
+            "}"
+        )
+    assert len(lines) > 1
+    assert all(len(line) == 80 for line in lines)
+    assert all(set(line) <= set("@%#*+=-:. ") for line in lines)
+
+
+def test_ascii_statement_accepts_a_str_variable():
+    with tempfile.TemporaryDirectory() as tmp:
+        image_path = Path(tmp) / "test.png"
+        _write_test_image(image_path)
+        lines = build_run_capture(
+            'class main() {\n'
+            f'var path: str = "{image_path.as_posix()}";\n'
+            "ascii path;\n"
+            "}"
+        )
+    assert len(lines) > 1
+
+
+def test_ascii_statement_missing_file_raises_clean_error():
+    with pytest.raises(EvansLangError):
+        build_and_run('class main() {\nascii "does_not_exist.png";\n}')
+
+
+def test_ascii_statement_rejects_non_str_argument():
+    with pytest.raises(EvansLangError):
+        build_and_run("class main() {\nascii 5;\n}")
+
+
+def test_ascii_statement_missing_file_is_catchable():
+    lines = build_run_capture(
+        'class main() {\n'
+        'try {\nascii "does_not_exist.png";\n}\n'
+        'catch (e: str) {\nprint(e);\n}\n'
+        "}"
+    )
+    assert len(lines) == 1
+    assert "does_not_exist.png" in lines[0]

@@ -467,6 +467,32 @@ comma-separated inside `[...]`, with `str` elements quoted (`["a", 1,
 true]`) so they're distinguishable from other element types in the
 output.
 
+### ascii
+
+```
+ascii <expression>;
+```
+
+Loads the image at the path given by `<expression>` (a `str`, evaluated
+the same as any other expression — a string literal or a variable) and
+prints it to stdout as ASCII art, scaled to a fixed 80-column width with
+the height adjusted to roughly preserve the source image's aspect ratio.
+Requires the `pillow` package to be installed (see `requirements.txt`) —
+`.png`, `.jpg`, and every other format Pillow supports are accepted. The
+path is resolved relative to the current working directory the `evlng`
+CLI is run from, not the `.el` file's own location. A missing file, an
+unreadable/corrupt image, or a non-`str` expression are all runtime
+errors (catchable with `try`/`catch`, the same as any other runtime
+error); Pillow not being installed is also a runtime error, only raised
+the first time `ascii` actually runs, not at parse or build time.
+
+```
+ascii "photo.png";
+
+var path: str = "photo.png";
+ascii path;
+```
+
 ### comments
 
 ```
@@ -615,7 +641,7 @@ filename       := IDENTIFIER ("." IDENTIFIER)*
 classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
 statement      := printStmt | varDecl | listDecl | assignment | derefAssign
                   | indexAssign | compoundAssign | ifStmt | whileStmt | forStmt
-                  | tryStmt | throwStmt | exprStmt | callStmt
+                  | tryStmt | throwStmt | asciiStmt | exprStmt | callStmt
 callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
@@ -634,6 +660,7 @@ forStmt        := "for" "(" forClause? ";" expression? ";" forClause? ")" block 
 forClause      := varDecl' | assignment' | compoundAssign'   # same forms, no trailing ";"
 tryStmt        := "try" block "catch" "(" IDENTIFIER ":" "str" ")" block ";"?
 throwStmt      := "throw" expression ";"
+asciiStmt      := "ascii" expression ";"
 exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")" | ".append" "(" expression ")"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool" | "ptr" "<" ("int" | "str" | "float" | "bool") ">"
@@ -677,3 +704,5 @@ time, not parse time) if it's the file actually being compiled/run.
 - Removing/inserting elements (`.pop()`, `.remove(...)`, `.insert(...)`) — only `.append(...)` exists so far
 - List literals/`[i]` indexing/`.append`/`.length` inside `for`-loop init/update clauses, or as a `catch (e: str)` binding target
 - Negative list indices (`nums[-1]`) or slicing (`nums[1:3]`)
+- Configurable ASCII art width, character ramp, or color output — `ascii` always renders at a fixed 80 columns using a fixed grayscale ramp
+- Saving/writing files of any kind — `ascii` only ever reads

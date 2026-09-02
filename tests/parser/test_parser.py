@@ -8,6 +8,7 @@ import pytest
 from nodes.nodes import (
     AddressOf,
     AppendCall,
+    AsciiStatement,
     Assignment,
     BinaryOp,
     BoolLiteral,
@@ -826,3 +827,21 @@ def test_rejects_append_on_a_non_list_variable():
 def test_rejects_length_on_a_non_list_variable():
     with pytest.raises(ParseError):
         parse_program("var x: int = 5;\nprint(x.length());")
+
+
+def test_parses_ascii_statement_with_string_literal():
+    statements = parse_program('ascii "image.png";')
+
+    statement = statements[0]
+    assert isinstance(statement, AsciiStatement)
+    assert isinstance(statement.path, StringLiteral)
+    assert statement.path.value == "image.png"
+
+
+def test_parses_ascii_statement_with_identifier():
+    statements = parse_program('var path: str = "image.png";\nascii path;')
+
+    statement = statements[1]
+    assert isinstance(statement, AsciiStatement)
+    assert isinstance(statement.path, Identifier)
+    assert statement.path.name == "path"

@@ -68,6 +68,51 @@ def _display_element(value) -> str:
     return displayed if isinstance(displayed, str) else str(displayed)
 
 
+ASCII_WIDTH = 80
+# Terminal character cells are roughly twice as tall as they are wide, so
+# scaling the height by the same factor as the width would render a
+# vertically-stretched image; halving it (times an extra 0.5 for the
+# characters-are-taller-than-wide ratio) keeps the printed aspect ratio
+# close to the source image's.
+ASCII_HEIGHT_RATIO = 0.55
+ASCII_RAMP = "@%#*+=-:. "  # darkest to lightest
+
+
+def render_ascii_art(path: str) -> str:
+    try:
+        from PIL import Image
+    except ImportError:
+        raise EvansLangError(
+            "The 'ascii' statement requires the 'pillow' package "
+            "(pip install pillow)"
+        )
+
+    try:
+        image = Image.open(path)
+    except FileNotFoundError:
+        raise EvansLangError(f"Image file not found: {path!r}")
+    except Exception as error:
+        raise EvansLangError(f"Cannot open image {path!r}: {error}")
+
+    with image:
+        width, height = image.size
+        new_width = ASCII_WIDTH
+        new_height = max(1, int(height * ASCII_HEIGHT_RATIO * (new_width / width)))
+        grayscale = image.convert("L").resize((new_width, new_height))
+        pixels = grayscale.tobytes()
+
+    ramp_last_index = len(ASCII_RAMP) - 1
+    rows = []
+    for row_start in range(0, len(pixels), new_width):
+        row_pixels = pixels[row_start : row_start + new_width]
+        row = "".join(
+            ASCII_RAMP[ramp_last_index - (pixel * ramp_last_index // 255)]
+            for pixel in row_pixels
+        )
+        rows.append(row)
+    return "\n".join(rows)
+
+
 def parse_as(text: str, target_type: str):
     if target_type == "str":
         return text
