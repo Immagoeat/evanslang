@@ -39,6 +39,7 @@ class OpCode(Enum):
     LIST_APPEND = auto()
     LIST_LEN = auto()
     ASCII = auto()
+    VIDEO = auto()
     HALT = auto()
 
 

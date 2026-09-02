@@ -7,6 +7,7 @@ from utils.runtime import (
     check_element_type,
     display,
     parse_as,
+    play_ascii_video,
     render_ascii_art,
 )
 
@@ -217,6 +218,13 @@ class VM:
                     f"Cannot use a {type(path).__name__} as an ascii image path (expected str)"
                 )
             print(render_ascii_art(path))
+        elif instruction.opcode == OpCode.VIDEO:
+            path = self.stack.pop()
+            if not isinstance(path, str):
+                raise EvansLangError(
+                    f"Cannot use a {type(path).__name__} as a video path (expected str)"
+                )
+            play_ascii_video(path)
         elif instruction.opcode == OpCode.HALT:
             return None
         else:

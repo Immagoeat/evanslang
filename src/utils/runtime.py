@@ -78,6 +78,29 @@ ASCII_HEIGHT_RATIO = 0.55
 ASCII_RAMP = "@%#*+=-:. "  # darkest to lightest
 
 
+def _ascii_dimensions(width: int, height: int) -> tuple[int, int]:
+    new_width = ASCII_WIDTH
+    new_height = max(1, int(height * ASCII_HEIGHT_RATIO * (new_width / width)))
+    return new_width, new_height
+
+
+def _pixels_to_ascii(pixels: bytes, width: int) -> str:
+    # pixels is one 0-255 grayscale byte per pixel, row-major (len(pixels)
+    # == width * height) - shared by both a still image (render_ascii_art)
+    # and each decoded video frame (play_ascii_video), so the two stay
+    # visually consistent rather than each having its own ramp-mapping copy.
+    ramp_last_index = len(ASCII_RAMP) - 1
+    rows = []
+    for row_start in range(0, len(pixels), width):
+        row_pixels = pixels[row_start : row_start + width]
+        row = "".join(
+            ASCII_RAMP[ramp_last_index - (pixel * ramp_last_index // 255)]
+            for pixel in row_pixels
+        )
+        rows.append(row)
+    return "\n".join(rows)
+
+
 def render_ascii_art(path: str) -> str:
     try:
         from PIL import Image
@@ -96,21 +119,51 @@ def render_ascii_art(path: str) -> str:
 
     with image:
         width, height = image.size
-        new_width = ASCII_WIDTH
-        new_height = max(1, int(height * ASCII_HEIGHT_RATIO * (new_width / width)))
+        new_width, new_height = _ascii_dimensions(width, height)
         grayscale = image.convert("L").resize((new_width, new_height))
         pixels = grayscale.tobytes()
 
-    ramp_last_index = len(ASCII_RAMP) - 1
-    rows = []
-    for row_start in range(0, len(pixels), new_width):
-        row_pixels = pixels[row_start : row_start + new_width]
-        row = "".join(
-            ASCII_RAMP[ramp_last_index - (pixel * ramp_last_index // 255)]
-            for pixel in row_pixels
+    return _pixels_to_ascii(pixels, new_width)
+
+
+ANSI_CLEAR_SCREEN = "\033[2J\033[H"
+
+
+def play_ascii_video(path: str) -> None:
+    import time
+
+    try:
+        import cv2
+    except ImportError:
+        raise EvansLangError(
+            "The 'video' statement requires the 'opencv-python' package "
+            "(pip install opencv-python)"
         )
-        rows.append(row)
-    return "\n".join(rows)
+
+    capture = cv2.VideoCapture(path)
+    if not capture.isOpened():
+        capture.release()
+        raise EvansLangError(f"Video file not found or unreadable: {path!r}")
+
+    try:
+        fps = capture.get(cv2.CAP_PROP_FPS)
+        # Some containers/codecs report 0 (or nonsense) for FPS - fall back
+        # to a reasonable default rather than dividing by zero or sleeping
+        # for a nonsensical duration between frames.
+        frame_delay = 1.0 / fps if fps and fps > 0 else 1.0 / 24.0
+
+        while True:
+            ok, frame = capture.read()
+            if not ok:
+                break
+            height, width = frame.shape[:2]
+            new_width, new_height = _ascii_dimensions(width, height)
+            grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            resized = cv2.resize(grayscale, (new_width, new_height))
+            print(ANSI_CLEAR_SCREEN + _pixels_to_ascii(resized.tobytes(), new_width))
+            time.sleep(frame_delay)
+    finally:
+        capture.release()
 
 
 def parse_as(text: str, target_type: str):

@@ -2,7 +2,7 @@ const vscode = require("vscode");
 
 const KEYWORDS = ["class", "var", "list", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "ment", "mentions"];
 const TYPES = ["int", "str", "float", "bool", "ptr"];
-const BUILTINS = ["print", "input", "ascii"];
+const BUILTINS = ["print", "input", "ascii", "video"];
 const BOOLEAN_LITERALS = ["true", "false"];
 
 function keywordCompletions() {
@@ -36,6 +36,11 @@ function builtinCompletions() {
   asciiStmt.detail = "ascii <expression>; - prints an image as ASCII art";
   asciiStmt.insertText = new vscode.SnippetString('ascii "${1:image.png}";');
   items.push(asciiStmt);
+
+  const videoStmt = new vscode.CompletionItem("video", vscode.CompletionItemKind.Function);
+  videoStmt.detail = "video <expression>; - plays a video as ASCII art";
+  videoStmt.insertText = new vscode.SnippetString('video "${1:clip.mp4}";');
+  items.push(videoStmt);
 
   const parseCall = new vscode.CompletionItem("parse", vscode.CompletionItemKind.Method);
   parseCall.detail = "<str variable>.parse(<type>)";

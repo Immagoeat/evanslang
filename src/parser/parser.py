@@ -30,6 +30,7 @@ from nodes.nodes import (
     TryStatement,
     UnaryOp,
     VarDecl,
+    VideoStatement,
     WhileStatement,
 )
 from lexer.token import Token, TokenType
@@ -196,6 +197,8 @@ class Parser:
             return self._parse_throw_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "ascii":
             return self._parse_ascii_statement()
+        if token.type == TokenType.IDENTIFIER and token.value == "video":
+            return self._parse_video_statement()
         if token.type == TokenType.STAR:
             return self._parse_deref_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
@@ -488,6 +491,12 @@ class Parser:
         path = self._parse_expression()
         self._expect(TokenType.SEMICOLON)
         return AsciiStatement(path)
+
+    def _parse_video_statement(self) -> VideoStatement:
+        self._expect(TokenType.IDENTIFIER, "video")
+        path = self._parse_expression()
+        self._expect(TokenType.SEMICOLON)
+        return VideoStatement(path)
 
     def _parse_for_clause_statement(self):
         # The init/update clauses of a for-header are statements without

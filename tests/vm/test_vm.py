@@ -459,3 +459,74 @@ def test_ascii_statement_missing_file_is_catchable():
     )
     assert len(lines) == 1
     assert "does_not_exist.png" in lines[0]
+
+
+def _write_test_video(path) -> None:
+    cv2 = pytest.importorskip("cv2")
+    import numpy as np
+
+    # A high fps and only 2 frames keeps the test itself fast, since
+    # play_ascii_video() sleeps ~1/fps between frames.
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(path), fourcc, 60.0, (10, 10))
+    for shade in (0, 255):
+        frame = np.full((10, 10, 3), shade, dtype=np.uint8)
+        writer.write(frame)
+    writer.release()
+
+
+def test_video_statement_plays_and_returns():
+    with tempfile.TemporaryDirectory() as tmp:
+        video_path = Path(tmp) / "test.mp4"
+        _write_test_video(video_path)
+        lines = build_run_capture(
+            'class main() {\n'
+            f'video "{video_path.as_posix()}";\n'
+            'print("done");\n'
+            "}"
+        )
+    assert lines[-1] == "done"
+    # Each frame's first printed line is prefixed with the ANSI
+    # clear-screen sequence (\033[2J\033[H) - strip it before checking the
+    # rest is pure ramp characters.
+    ascii_lines = [
+        line.replace("\033[2J\033[H", "") for line in lines if line != "done"
+    ]
+    ascii_lines = [line for line in ascii_lines if line]
+    assert len(ascii_lines) > 1
+    assert all(set(line) <= set("@%#*+=-:. ") for line in ascii_lines)
+
+
+def test_video_statement_accepts_a_str_variable():
+    with tempfile.TemporaryDirectory() as tmp:
+        video_path = Path(tmp) / "test.mp4"
+        _write_test_video(video_path)
+        lines = build_run_capture(
+            'class main() {\n'
+            f'var path: str = "{video_path.as_posix()}";\n'
+            "video path;\n"
+            'print("done");\n'
+            "}"
+        )
+    assert lines[-1] == "done"
+
+
+def test_video_statement_missing_file_raises_clean_error():
+    with pytest.raises(EvansLangError):
+        build_and_run('class main() {\nvideo "does_not_exist.mp4";\n}')
+
+
+def test_video_statement_rejects_non_str_argument():
+    with pytest.raises(EvansLangError):
+        build_and_run("class main() {\nvideo 5;\n}")
+
+
+def test_video_statement_missing_file_is_catchable():
+    lines = build_run_capture(
+        'class main() {\n'
+        'try {\nvideo "does_not_exist.mp4";\n}\n'
+        'catch (e: str) {\nprint(e);\n}\n'
+        "}"
+    )
+    assert len(lines) == 1
+    assert "does_not_exist.mp4" in lines[0]

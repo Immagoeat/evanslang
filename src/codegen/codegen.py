@@ -27,6 +27,7 @@ from nodes.nodes import (
     TryStatement,
     UnaryOp,
     VarDecl,
+    VideoStatement,
     WhileStatement,
 )
 from ir.ir import Instruction, OpCode
@@ -169,6 +170,11 @@ class CodeGenerator:
             return [
                 *self._generate_expression(node.path),
                 Instruction(OpCode.ASCII),
+            ]
+        if isinstance(node, VideoStatement):
+            return [
+                *self._generate_expression(node.path),
+                Instruction(OpCode.VIDEO),
             ]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")
 

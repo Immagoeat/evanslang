@@ -279,6 +279,14 @@ class AsciiStatement(Node):
         return f"AsciiStatement({self.path!r})"
 
 
+class VideoStatement(Node):
+    def __init__(self, path: Node):
+        self.path = path
+
+    def __repr__(self):
+        return f"VideoStatement({self.path!r})"
+
+
 class ClassDecl(Node):
     def __init__(self, name: str, is_ment: bool, body: list[Node]):
         self.name = name

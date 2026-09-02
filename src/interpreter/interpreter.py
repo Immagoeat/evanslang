@@ -27,6 +27,7 @@ from nodes.nodes import (
     TryStatement,
     UnaryOp,
     VarDecl,
+    VideoStatement,
     WhileStatement,
 )
 from linker.linker import ResolvedProgram
@@ -37,6 +38,7 @@ from utils.runtime import (
     check_element_type,
     display,
     parse_as,
+    play_ascii_video,
     render_ascii_art,
 )
 
@@ -194,6 +196,14 @@ class Interpreter:
                     f"Cannot use a {type(path).__name__} as an ascii image path (expected str)"
                 )
             print(render_ascii_art(path))
+            return
+        if isinstance(node, VideoStatement):
+            path = self._evaluate(node.path)
+            if not isinstance(path, str):
+                raise EvansLangError(
+                    f"Cannot use a {type(path).__name__} as a video path (expected str)"
+                )
+            play_ascii_video(path)
             return
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 

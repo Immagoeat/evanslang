@@ -82,7 +82,7 @@
         },
         {
           "name": "support.function.builtin.evanslang",
-          "match": "\\b(print|input|ascii)\\b"
+          "match": "\\b(print|input|ascii|video)\\b"
         }
       ]
     },
@@ -179,7 +179,7 @@
       "patterns": [
         {
           "comment": "NAME; - a local class call (not print/input, those are builtins above)",
-          "match": "\\b(?!print\\b|input\\b|ascii\\b|var\\b|list\\b|if\\b|elseif\\b|else\\b|while\\b|for\\b|try\\b|catch\\b|throw\\b|true\\b|false\\b|class\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=;)",
+          "match": "\\b(?!print\\b|input\\b|ascii\\b|video\\b|var\\b|list\\b|if\\b|elseif\\b|else\\b|while\\b|for\\b|try\\b|catch\\b|throw\\b|true\\b|false\\b|class\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=;)",
           "captures": {
             "1": { "name": "entity.name.function.call.evanslang" }
           }

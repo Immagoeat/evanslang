@@ -33,6 +33,7 @@ from nodes.nodes import (
     TryStatement,
     UnaryOp,
     VarDecl,
+    VideoStatement,
     WhileStatement,
 )
 from lexer.lexer import Lexer
@@ -843,5 +844,23 @@ def test_parses_ascii_statement_with_identifier():
 
     statement = statements[1]
     assert isinstance(statement, AsciiStatement)
+    assert isinstance(statement.path, Identifier)
+    assert statement.path.name == "path"
+
+
+def test_parses_video_statement_with_string_literal():
+    statements = parse_program('video "clip.mp4";')
+
+    statement = statements[0]
+    assert isinstance(statement, VideoStatement)
+    assert isinstance(statement.path, StringLiteral)
+    assert statement.path.value == "clip.mp4"
+
+
+def test_parses_video_statement_with_identifier():
+    statements = parse_program('var path: str = "clip.mp4";\nvideo path;')
+
+    statement = statements[1]
+    assert isinstance(statement, VideoStatement)
     assert isinstance(statement.path, Identifier)
     assert statement.path.name == "path"

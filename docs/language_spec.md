@@ -493,6 +493,35 @@ var path: str = "photo.png";
 ascii path;
 ```
 
+### video
+
+```
+video <expression>;
+```
+
+Loads the video at the path given by `<expression>` (a `str`, same rules
+as `ascii`'s path) and plays it as ASCII art directly in the terminal:
+each frame is converted the same way `ascii` converts a still image (same
+80-column width, same character ramp), the screen is cleared before each
+frame is printed (so it looks like an animation playing in place, not a
+wall of scrolling text), and playback is paced to roughly match the
+source video's own frame rate. `video <expression>;` blocks until
+playback finishes — the statement after it doesn't run until every frame
+has played. Requires the `opencv-python` package to be installed (see
+`requirements.txt`); `.mp4`, `.avi`, `.mov`, and most other common
+container/codec combinations are accepted, since decoding is delegated
+entirely to OpenCV. The same error handling as `ascii` applies: a missing
+file, an unreadable/corrupt video, or a non-`str` expression are all
+catchable runtime errors, as is `opencv-python` not being installed
+(raised only the first time `video` actually runs).
+
+```
+video "clip.mp4";
+
+var path: str = "clip.mp4";
+video path;
+```
+
 ### comments
 
 ```
@@ -641,7 +670,7 @@ filename       := IDENTIFIER ("." IDENTIFIER)*
 classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
 statement      := printStmt | varDecl | listDecl | assignment | derefAssign
                   | indexAssign | compoundAssign | ifStmt | whileStmt | forStmt
-                  | tryStmt | throwStmt | asciiStmt | exprStmt | callStmt
+                  | tryStmt | throwStmt | asciiStmt | videoStmt | exprStmt | callStmt
 callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
@@ -661,6 +690,7 @@ forClause      := varDecl' | assignment' | compoundAssign'   # same forms, no tr
 tryStmt        := "try" block "catch" "(" IDENTIFIER ":" "str" ")" block ";"?
 throwStmt      := "throw" expression ";"
 asciiStmt      := "ascii" expression ";"
+videoStmt      := "video" expression ";"
 exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")" | ".append" "(" expression ")"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool" | "ptr" "<" ("int" | "str" | "float" | "bool") ">"
@@ -704,5 +734,7 @@ time, not parse time) if it's the file actually being compiled/run.
 - Removing/inserting elements (`.pop()`, `.remove(...)`, `.insert(...)`) — only `.append(...)` exists so far
 - List literals/`[i]` indexing/`.append`/`.length` inside `for`-loop init/update clauses, or as a `catch (e: str)` binding target
 - Negative list indices (`nums[-1]`) or slicing (`nums[1:3]`)
-- Configurable ASCII art width, character ramp, or color output — `ascii` always renders at a fixed 80 columns using a fixed grayscale ramp
-- Saving/writing files of any kind — `ascii` only ever reads
+- Configurable ASCII art width, character ramp, or color output — `ascii`/`video` always render at a fixed 80 columns using a fixed grayscale ramp
+- Saving/writing files of any kind — `ascii`/`video` only ever read
+- Interrupting/stopping `video` playback early (e.g. `break`, or a keypress) — it always plays every frame to completion
+- Audio playback — `video` only renders the visual frames as ASCII art; any audio track is ignored entirely
