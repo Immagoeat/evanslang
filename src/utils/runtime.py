@@ -1,3 +1,6 @@
+import shutil
+import subprocess
+
 from utils.errors import EvansLangError
 
 
@@ -129,6 +132,28 @@ def render_ascii_art(path: str) -> str:
 ANSI_CLEAR_SCREEN = "\033[2J\033[H"
 
 
+def _start_audio_playback(path: str):
+    # Best-effort only: ffplay is a separate system binary (not the
+    # opencv-python pip dependency the frame loop uses), so its absence
+    # must never break video playback - a program that already worked
+    # silently before audio support was added must keep working exactly
+    # the same way if ffplay isn't installed. -nodisp suppresses ffplay's
+    # own video window (frames are already being rendered as ASCII by the
+    # caller); a file with no audio track just makes ffplay exit almost
+    # immediately on its own, which is harmless since nothing here waits
+    # on it finishing before the frame loop proceeds.
+    if shutil.which("ffplay") is None:
+        return None
+    try:
+        return subprocess.Popen(
+            ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return None
+
+
 def play_ascii_video(path: str) -> None:
     import time
 
@@ -145,6 +170,8 @@ def play_ascii_video(path: str) -> None:
         capture.release()
         raise EvansLangError(f"Video file not found or unreadable: {path!r}")
 
+    audio_process = _start_audio_playback(path)
+    completed = False
     try:
         fps = capture.get(cv2.CAP_PROP_FPS)
         # Some containers/codecs report 0 (or nonsense) for FPS - fall back
@@ -162,8 +189,23 @@ def play_ascii_video(path: str) -> None:
             resized = cv2.resize(grayscale, (new_width, new_height))
             print(ANSI_CLEAR_SCREEN + _pixels_to_ascii(resized.tobytes(), new_width))
             time.sleep(frame_delay)
+        completed = True
     finally:
         capture.release()
+        if audio_process is not None:
+            if completed:
+                # The frame loop and the audio track may finish at
+                # slightly different times (frame conversion has its own
+                # CPU cost, so video playback commonly lags slightly
+                # behind real audio time) - wait for ffplay to finish its
+                # own timeline rather than cutting audio off the instant
+                # the last frame is drawn.
+                audio_process.wait()
+            else:
+                # The frame loop raised partway through - don't leave
+                # audio playing (or block error propagation waiting for
+                # it) for a video that didn't finish.
+                audio_process.terminate()
 
 
 def parse_as(text: str, target_type: str):

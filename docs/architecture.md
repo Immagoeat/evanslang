@@ -581,8 +581,9 @@ in one call, so the clear and the frame reach the terminal together
 rather than as two separate writes that could interleave with anything
 else touching stdout. `time.sleep(frame_delay)` after each frame is what
 paces playback to roughly the source's own frame rate; the whole loop
-runs inside a `try/finally` so `capture.release()` always happens, even
-if a frame's conversion somehow raised.
+runs inside a `try/finally` (see "audio" below for what that `finally`
+now also does) so `capture.release()` always happens, even if a frame's
+conversion somehow raised.
 
 **Blocking, not asynchronous**: `video <expression>;` behaves like any
 other statement — the VM/interpreter's normal instruction dispatch is
@@ -591,3 +592,43 @@ nothing else in the program runs until every frame has played and the
 statement returns control. There's no way (yet — see "Not yet
 implemented" in `docs/language_spec.md`) to play a video in the
 background or interrupt it early.
+
+**Audio**: `_start_audio_playback(path)` (`utils/runtime.py`, private —
+not exported the way `render_ascii_art`/`play_ascii_video` are, since
+nothing outside this module calls it directly) launches
+`ffplay -nodisp -autoexit -loglevel quiet <path>` as a background
+`subprocess.Popen`, called once at the very start of `play_ascii_video()`
+— before the frame loop, not per-frame — so it runs concurrently with
+frame rendering rather than being driven by it. `-nodisp` suppresses
+ffplay's own video window (the ASCII frames are the visual output; ffplay
+is only there for the audio track), `-autoexit` makes it quit on its own
+once playback ends instead of lingering, and `-loglevel quiet` keeps its
+own stderr/stdout out of the terminal (both further redirected to
+`subprocess.DEVNULL` for good measure). This is deliberately best-effort
+and silent-on-failure at every step: `shutil.which("ffplay")` returning
+`None` (the binary isn't installed) short-circuits to returning `None`
+before ever calling `Popen`, and a `Popen` call that itself raises
+`OSError` is caught and also returns `None` — either way,
+`play_ascii_video()` treats a `None` audio process as "no audio, proceed
+silently" rather than surfacing an error, since audio was never
+guaranteed and a program that already worked without it must keep working
+identically if `ffplay` is absent. A source file with no audio track
+doesn't need special-casing at all: `ffplay` given a video-only file just
+exits almost immediately on its own once it finds nothing to play,
+without erroring.
+
+Cleanup lives in the same `finally` block that releases the OpenCV
+capture, but it branches on whether the frame loop actually finished: a
+`completed` flag is set to `True` only after the `while` loop exits
+normally (video exhausted), not if an exception propagated out of it. On
+the normal-completion path, `audio_process.wait()` blocks until `ffplay`
+finishes its own timeline — necessary because frame *conversion* has real
+CPU cost per frame (grayscale + resize + ramp-mapping, all in Python),
+so the video side commonly finishes marginally behind the audio track's
+wall-clock length even though both started together; without the wait,
+`video <expression>;` could return control to the rest of the program
+while `ffplay` is still audibly playing in the background. On the
+error path, `audio_process.terminate()` is called instead (not `.wait()`)
+so a mid-playback failure doesn't also block error propagation on
+however much of the audio track remains, and doesn't leave a video's
+audio playing after the statement raised.

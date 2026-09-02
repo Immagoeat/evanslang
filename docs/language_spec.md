@@ -515,6 +515,17 @@ file, an unreadable/corrupt video, or a non-`str` expression are all
 catchable runtime errors, as is `opencv-python` not being installed
 (raised only the first time `video` actually runs).
 
+If the source file has an audio track, `video` also plays it automatically,
+in sync with the ASCII frames — no separate syntax needed. This is
+best-effort: it requires the `ffplay` command (part of
+[ffmpeg](https://ffmpeg.org/)) to be installed as a system tool, separate
+from the `opencv-python` Python package that decodes the video frames
+themselves. If `ffplay` isn't found on the system, or the file has no
+audio track, `video` silently falls back to the picture-only playback it
+always had — never an error, and never a reason `video` would behave any
+differently otherwise. There's no way to disable audio playback, or to
+play only audio without the ASCII frames.
+
 ```
 video "clip.mp4";
 
@@ -737,4 +748,4 @@ time, not parse time) if it's the file actually being compiled/run.
 - Configurable ASCII art width, character ramp, or color output — `ascii`/`video` always render at a fixed 80 columns using a fixed grayscale ramp
 - Saving/writing files of any kind — `ascii`/`video` only ever read
 - Interrupting/stopping `video` playback early (e.g. `break`, or a keypress) — it always plays every frame to completion
-- Audio playback — `video` only renders the visual frames as ASCII art; any audio track is ignored entirely
+- Standalone audio-only playback, volume control, muting, or disabling audio for a specific `video` call — `video`'s audio is all-or-nothing (plays automatically if `ffplay` is available and the file has a track, otherwise silent) with no per-call control

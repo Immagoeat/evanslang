@@ -530,3 +530,66 @@ def test_video_statement_missing_file_is_catchable():
     )
     assert len(lines) == 1
     assert "does_not_exist.mp4" in lines[0]
+
+
+def test_start_audio_playback_returns_none_when_ffplay_missing(monkeypatch):
+    from utils import runtime
+
+    monkeypatch.setattr(runtime.shutil, "which", lambda name: None)
+    assert runtime._start_audio_playback("whatever.mp4") is None
+
+
+def test_video_plays_normally_when_ffplay_is_missing(monkeypatch):
+    # Audio is best-effort: play_ascii_video() must still complete and
+    # play its frames even when no audio backend is available at all.
+    from utils import runtime
+
+    monkeypatch.setattr(runtime, "_start_audio_playback", lambda path: None)
+    with tempfile.TemporaryDirectory() as tmp:
+        video_path = Path(tmp) / "test.mp4"
+        _write_test_video(video_path)
+        lines = build_run_capture(
+            'class main() {\n'
+            f'video "{video_path.as_posix()}";\n'
+            'print("done");\n'
+            "}"
+        )
+    assert lines[-1] == "done"
+
+
+def test_video_terminates_audio_process_on_mid_playback_error(monkeypatch):
+    from utils import runtime
+
+    class _FakeProcess:
+        def __init__(self):
+            self.terminated = False
+            self.waited = False
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self):
+            self.waited = True
+
+    fake_process = _FakeProcess()
+    monkeypatch.setattr(runtime, "_start_audio_playback", lambda path: fake_process)
+
+    # Force the frame loop to blow up on its first iteration by handing it
+    # a video file that opens successfully (isOpened() True) but whose
+    # very first .read() call errors - simulated by monkeypatching cv2's
+    # resize to raise, which is simpler than crafting a truly corrupt file.
+    cv2 = pytest.importorskip("cv2")
+
+    def _broken_resize(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cv2, "resize", _broken_resize)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        video_path = Path(tmp) / "test.mp4"
+        _write_test_video(video_path)
+        with pytest.raises(Exception):
+            runtime.play_ascii_video(str(video_path))
+
+    assert fake_process.terminated is True
+    assert fake_process.waited is False
