@@ -77,6 +77,14 @@
           "match": "\\b(try|catch|throw)\\b"
         },
         {
+          "comment": "goto ln: N; - `ln` is only meaningful right after `goto`",
+          "match": "\\b(goto)\\s+(ln)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.goto.evanslang" },
+            "2": { "name": "keyword.control.goto.evanslang" }
+          }
+        },
+        {
           "name": "storage.type.var.evanslang",
           "match": "\\b(var|list)\\b"
         },
@@ -179,7 +187,7 @@
       "patterns": [
         {
           "comment": "NAME; - a local class call (not print/input, those are builtins above)",
-          "match": "\\b(?!print\\b|input\\b|ascii\\b|video\\b|var\\b|list\\b|if\\b|elseif\\b|else\\b|while\\b|for\\b|try\\b|catch\\b|throw\\b|true\\b|false\\b|class\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=;)",
+          "match": "\\b(?!print\\b|input\\b|ascii\\b|video\\b|var\\b|list\\b|if\\b|elseif\\b|else\\b|while\\b|for\\b|try\\b|catch\\b|throw\\b|goto\\b|true\\b|false\\b|class\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=;)",
           "captures": {
             "1": { "name": "entity.name.function.call.evanslang" }
           }

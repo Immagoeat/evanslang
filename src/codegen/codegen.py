@@ -11,6 +11,7 @@ from nodes.nodes import (
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
+    GotoStatement,
     Identifier,
     IfStatement,
     IndexAssignment,
@@ -56,6 +57,18 @@ UNARY_OPCODES = {
 }
 
 
+class _UnresolvedGoto:
+    # Placeholder operand for a goto's JUMP, patched to a real relative
+    # offset once the whole class body's line_map is known (see
+    # generate()'s per-class resolution pass). A dedicated sentinel type
+    # (rather than reusing operand=None, which _generate_if's own
+    # patch-the-trailing-JUMP pass also produces and scans for) keeps the
+    # two unrelated "this JUMP isn't resolved yet" mechanisms from
+    # colliding.
+    def __init__(self, target_line: int):
+        self.target_line = target_line
+
+
 class CodeGenerator:
     def generate(self, resolved: ResolvedProgram) -> IrProgram:
         # Compile every class body independently first (each ending in a
@@ -66,9 +79,21 @@ class CodeGenerator:
         class_blocks: dict[str, list[Instruction]] = {}
         for name, class_decl in resolved.classes.items():
             body_instrs: list[Instruction] = []
+            # Records, for each top-level statement's source line, the
+            # instruction index (within this class's own block) where that
+            # statement's codegen output begins - this is the goto target
+            # space: `goto ln: N;` can only ever jump to the start of a
+            # top-level statement in the SAME class body, never into a
+            # nested if/while/for/try body (the parser already rejects a
+            # goto written inside one of those, and there is no top-level
+            # line_map entry for anything nested, so a goto could never
+            # resolve to one even if it somehow got past the parser).
+            line_map: dict[int, int] = {}
             for statement in class_decl.body:
+                line_map[statement.line] = len(body_instrs)
                 body_instrs.extend(self._generate_statement(statement))
             body_instrs.append(Instruction(OpCode.RETURN))
+            self._resolve_gotos(body_instrs, line_map, name)
             class_blocks[name] = body_instrs
 
         prologue: list[Instruction] = []
@@ -97,6 +122,27 @@ class CodeGenerator:
                 instruction.operand = block_starts[target]
 
         return IrProgram(instructions)
+
+    def _resolve_gotos(
+        self, body_instrs: list[Instruction], line_map: dict[int, int], class_name: str
+    ) -> None:
+        # Runs once per class, after that class's own body_instrs and
+        # line_map are both fully built (so forward gotos - targeting a
+        # line later in the same class body, not yet seen when the goto
+        # itself was parsed - resolve correctly, same as backward ones).
+        for index, instruction in enumerate(body_instrs):
+            if instruction.opcode != OpCode.JUMP or not isinstance(
+                instruction.operand, _UnresolvedGoto
+            ):
+                continue
+            target_line = instruction.operand.target_line
+            target_index = line_map.get(target_line)
+            if target_index is None:
+                raise EvansLangError(
+                    f"goto ln: {target_line} does not match any top-level "
+                    f"statement in class {class_name!r}"
+                )
+            instruction.operand = target_index - index
 
     def _generate_statement(self, node) -> list[Instruction]:
         if isinstance(node, CallStatement):
@@ -176,6 +222,8 @@ class CodeGenerator:
                 *self._generate_expression(node.path),
                 Instruction(OpCode.VIDEO),
             ]
+        if isinstance(node, GotoStatement):
+            return [Instruction(OpCode.JUMP, _UnresolvedGoto(node.target_line))]
         raise NotImplementedError(f"Cannot generate code for node: {node!r}")
 
     def _generate_try(self, node: TryStatement) -> list[Instruction]:

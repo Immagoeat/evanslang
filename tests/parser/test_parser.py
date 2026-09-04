@@ -18,6 +18,7 @@ from nodes.nodes import (
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
+    GotoStatement,
     Identifier,
     IfStatement,
     IndexAssignment,
@@ -864,3 +865,79 @@ def test_parses_video_statement_with_identifier():
     assert isinstance(statement, VideoStatement)
     assert isinstance(statement.path, Identifier)
     assert statement.path.name == "path"
+
+
+def test_parses_goto_statement():
+    statements = parse_program("goto ln: 5;")
+
+    statement = statements[0]
+    assert isinstance(statement, GotoStatement)
+    assert statement.target_line == 5
+
+
+def test_statements_are_tagged_with_their_source_line():
+    # parse_program wraps `source` as `class main() {\n<source>\n}`, so
+    # `source`'s own first line is line 2.
+    statements = parse_program('print("a");\nprint("b");')
+
+    assert statements[0].line == 2
+    assert statements[1].line == 3
+
+
+def test_parses_goto_inside_if_body():
+    statements = parse_program(
+        'if (true) {\ngoto ln: 5;\n}'
+    )
+    if_stmt = statements[0]
+    goto_stmt = if_stmt.body[0]
+    assert isinstance(goto_stmt, GotoStatement)
+    assert goto_stmt.target_line == 5
+
+
+def test_parses_goto_inside_nested_if_body():
+    statements = parse_program(
+        'if (true) {\nif (true) {\ngoto ln: 5;\n}\n}'
+    )
+    goto_stmt = statements[0].body[0].body[0]
+    assert isinstance(goto_stmt, GotoStatement)
+
+
+def test_parses_goto_inside_elseif_and_else_bodies():
+    statements = parse_program(
+        'if (false) {\nprint("a");\n}\n'
+        'elseif (false) {\ngoto ln: 1;\n}\n'
+        'else {\ngoto ln: 1;\n}'
+    )
+    if_stmt = statements[0]
+    assert isinstance(if_stmt.elif_branches[0][1][0], GotoStatement)
+    assert isinstance(if_stmt.else_body[0], GotoStatement)
+
+
+def test_rejects_goto_inside_while_body():
+    with pytest.raises(ParseError):
+        parse_program("while (true) {\ngoto ln: 1;\n}")
+
+
+def test_rejects_goto_inside_for_body():
+    with pytest.raises(ParseError):
+        parse_program("for (;;) {\ngoto ln: 1;\n}")
+
+
+def test_rejects_goto_inside_try_body():
+    with pytest.raises(ParseError):
+        parse_program('try {\ngoto ln: 1;\n}\ncatch (e: str) {\nprint(e);\n}')
+
+
+def test_rejects_goto_inside_catch_body():
+    with pytest.raises(ParseError):
+        parse_program('try {\nprint("a");\n}\ncatch (e: str) {\ngoto ln: 1;\n}')
+
+
+def test_rejects_goto_inside_while_nested_in_if():
+    # goto is allowed directly inside if/elseif/else, but a while inside
+    # an if must still reject it - the permission doesn't leak through
+    # while/for/try regardless of what encloses them.
+    with pytest.raises(ParseError):
+        parse_program(
+            'if (true) {\nwhile (true) {\ngoto ln: 1;\n}\n}'
+        )

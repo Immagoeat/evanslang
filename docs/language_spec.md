@@ -533,6 +533,58 @@ var path: str = "clip.mp4";
 video path;
 ```
 
+### goto
+
+```
+goto ln: <LINE NUMBER>;
+```
+
+Jumps to whichever top-level statement in the *same class body* starts on
+source line `<LINE NUMBER>` — an actual line number in the `.el` file, the
+same one your editor shows. `goto` only understands top-level statements:
+a class body's own statements directly inside its `{ }`, not anything
+nested inside an `if`/`elseif`/`else`/`while`/`for`/`try`/`catch` body.
+Both the `goto` statement itself and the line it targets are restricted
+this way, with one exception: `goto` may also be written directly inside
+an `if`, `elseif`, or `else` body (at any nesting depth of those), since a
+conditional block carries no state that a jump could leave dangling. It
+is never allowed inside a `while`, `for`, `try`, or `catch` body — even
+one nested inside an `if` — because jumping out of one of those mid-way
+would leave the loop's iteration state, or the `try`'s active error
+handler, in a state the VM has no way to unwind correctly.
+
+```
+class main() {
+    var i: int = 0;
+    print(i);
+    i += 1;
+    if (i < 3) {
+        goto ln: 3;
+    }
+    print("done");
+}
+# prints: 0, 1, 2, done
+```
+
+`goto` can jump forward (to a line later in the same class body) or
+backward (to an earlier one, as in the loop above) — both are resolved
+the same way, once the whole class has been parsed. The target line must
+match an actual top-level statement's starting line exactly; targeting a
+line that's blank, a comment, a closing `}`, a line inside a nested block,
+or a line in a *different* class is a build-time error (caught before the
+program ever runs, the same as most other structural mistakes — a
+`CallStatement` to an undefined class, for example — rather than a
+runtime error raised only if that `goto` actually executes).
+
+```
+class helper() {
+    print("in helper");   # line 2
+}
+class main() {
+    goto ln: 2;   # ERROR: line 2 belongs to a different class
+}
+```
+
 ### comments
 
 ```
@@ -681,7 +733,11 @@ filename       := IDENTIFIER ("." IDENTIFIER)*
 classDecl      := "class" IDENTIFIER "(" "ment"? ")" block ";"?
 statement      := printStmt | varDecl | listDecl | assignment | derefAssign
                   | indexAssign | compoundAssign | ifStmt | whileStmt | forStmt
-                  | tryStmt | throwStmt | asciiStmt | videoStmt | exprStmt | callStmt
+                  | tryStmt | throwStmt | asciiStmt | videoStmt | gotoStmt
+                  | exprStmt | callStmt
+                  # gotoStmt is only valid at a class body's own top level,
+                  # or directly inside an ifStmt's body/elseif/else (see
+                  # "goto" above) - not inside whileStmt/forStmt/tryStmt
 callStmt       := IDENTIFIER ";" | IDENTIFIER "." IDENTIFIER ";"
 printStmt      := "print" "(" expression ")" ";"
 varDecl        := "var" IDENTIFIER ":" type ("=" expression)? ";"
@@ -702,6 +758,7 @@ tryStmt        := "try" block "catch" "(" IDENTIFIER ":" "str" ")" block ";"?
 throwStmt      := "throw" expression ";"
 asciiStmt      := "ascii" expression ";"
 videoStmt      := "video" expression ";"
+gotoStmt       := "goto" "ln" ":" INT ";"
 exprStmt       := expression ";"    # currently only reachable via IDENTIFIER "." "parse" "(" type ")" | ".append" "(" expression ")"
 block          := "{" statement* "}"
 type           := "int" | "str" | "float" | "bool" | "ptr" "<" ("int" | "str" | "float" | "bool") ">"
@@ -749,3 +806,6 @@ time, not parse time) if it's the file actually being compiled/run.
 - Saving/writing files of any kind — `ascii`/`video` only ever read
 - Interrupting/stopping `video` playback early (e.g. `break`, or a keypress) — it always plays every frame to completion
 - Standalone audio-only playback, volume control, muting, or disabling audio for a specific `video` call — `video`'s audio is all-or-nothing (plays automatically if `ffplay` is available and the file has a track, otherwise silent) with no per-call control
+- Named labels for `goto` — only a literal source line number (`goto ln: 5;`) is supported, not a named target
+- `goto` targeting a line inside a `while`/`for`/`try`/`catch` body, or a `goto` written inside one of those bodies (even nested inside an `if`) — both are build-time errors; `goto` only understands top-level statements and statements directly inside `if`/`elseif`/`else`
+- `goto` jumping between classes — it only ever targets a line in the same class body the `goto` itself is written in

@@ -287,6 +287,14 @@ class VideoStatement(Node):
         return f"VideoStatement({self.path!r})"
 
 
+class GotoStatement(Node):
+    def __init__(self, target_line: int):
+        self.target_line = target_line
+
+    def __repr__(self):
+        return f"GotoStatement(target_line={self.target_line!r})"
+
+
 class ClassDecl(Node):
     def __init__(self, name: str, is_ment: bool, body: list[Node]):
         self.name = name

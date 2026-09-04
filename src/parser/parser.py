@@ -12,6 +12,7 @@ from nodes.nodes import (
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
+    GotoStatement,
     Identifier,
     IfStatement,
     IndexAssignment,
@@ -171,13 +172,13 @@ class Parser:
             is_ment = True
 
         self._expect(TokenType.RPAREN)
-        body = self._parse_block()
+        body = self._parse_block(is_class_body=True)
         self._skip_optional_semicolon()
 
         self.class_names.add(name_token.value)
         return ClassDecl(name_token.value, is_ment, body)
 
-    def _parse_statement(self):
+    def _parse_statement(self, allows_goto: bool = False):
         token = self._peek()
         if token.type == TokenType.IDENTIFIER and token.value == "print":
             return self._parse_print_statement()
@@ -186,7 +187,7 @@ class Parser:
         if token.type == TokenType.IDENTIFIER and token.value == "list":
             return self._parse_list_decl()
         if token.type == TokenType.IDENTIFIER and token.value == "if":
-            return self._parse_if_statement()
+            return self._parse_if_statement(allows_goto=allows_goto)
         if token.type == TokenType.IDENTIFIER and token.value == "while":
             return self._parse_while_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "for":
@@ -199,6 +200,8 @@ class Parser:
             return self._parse_ascii_statement()
         if token.type == TokenType.IDENTIFIER and token.value == "video":
             return self._parse_video_statement()
+        if token.type == TokenType.IDENTIFIER and token.value == "goto":
+            return self._parse_goto_statement()
         if token.type == TokenType.STAR:
             return self._parse_deref_assignment()
         if token.type == TokenType.IDENTIFIER and self._peek(1).type == TokenType.EQUALS:
@@ -400,12 +403,12 @@ class Parser:
                 name_token.column,
             )
 
-    def _parse_if_statement(self) -> IfStatement:
+    def _parse_if_statement(self, allows_goto: bool = False) -> IfStatement:
         self._expect(TokenType.IDENTIFIER, "if")
         self._expect(TokenType.LPAREN)
         condition = self._parse_expression()
         self._expect(TokenType.RPAREN)
-        body = self._parse_block()
+        body = self._parse_block(allows_goto=allows_goto)
         self._skip_optional_semicolon()
 
         elif_branches: list[tuple] = []
@@ -417,14 +420,14 @@ class Parser:
             self._expect(TokenType.LPAREN)
             elif_condition = self._parse_expression()
             self._expect(TokenType.RPAREN)
-            elif_body = self._parse_block()
+            elif_body = self._parse_block(allows_goto=allows_goto)
             self._skip_optional_semicolon()
             elif_branches.append((elif_condition, elif_body))
 
         else_body = None
         if self._peek().type == TokenType.IDENTIFIER and self._peek().value == "else":
             self._advance()
-            else_body = self._parse_block()
+            else_body = self._parse_block(allows_goto=allows_goto)
             self._skip_optional_semicolon()
 
         return IfStatement(condition, body, elif_branches, else_body)
@@ -498,6 +501,20 @@ class Parser:
         self._expect(TokenType.SEMICOLON)
         return VideoStatement(path)
 
+    def _parse_goto_statement(self) -> GotoStatement:
+        self._expect(TokenType.IDENTIFIER, "goto")
+        self._expect(TokenType.IDENTIFIER, "ln")
+        self._expect(TokenType.COLON)
+        line_token = self._expect(TokenType.INT)
+        self._expect(TokenType.SEMICOLON)
+        # The target line isn't validated here - it's resolved against the
+        # enclosing class body's actual statement-starting lines during
+        # codegen, once the whole class (including anything after this
+        # goto) has been parsed, so a forward goto to a line not yet seen
+        # can still be checked. See CodeGenerator._build_line_map /
+        # _generate_statement's GotoStatement handling.
+        return GotoStatement(int(line_token.value))
+
     def _parse_for_clause_statement(self):
         # The init/update clauses of a for-header are statements without
         # their own trailing ';' (the header's own ';'/')' delimits them
@@ -516,7 +533,17 @@ class Parser:
             token.column,
         )
 
-    def _parse_block(self) -> list:
+    def _parse_block(self, is_class_body: bool = False, allows_goto: bool = False) -> list:
+        # allows_goto is True for a class's own top-level body, and stays
+        # True through any if/elseif/else nesting (an if body has no
+        # stateful bookkeeping - no loop counter, no handler_stack entry -
+        # so a goto jumping out of one changes nothing the VM needs to
+        # unwind). It's always False for while/for/try/catch bodies
+        # regardless of what called _parse_block, since jumping out of
+        # those DOES leave stale state behind (see the design discussion
+        # in the commit that added goto for the try/catch case
+        # specifically - a stale TRY_BEGIN handler, or a loop variable
+        # left mid-iteration).
         self._expect(TokenType.LBRACE)
         statements = []
         while self._peek().type != TokenType.RBRACE:
@@ -526,7 +553,30 @@ class Parser:
                     self._peek().line,
                     self._peek().column,
                 )
-            statements.append(self._parse_statement())
+            # Every top-level statement gets tagged with the source line it
+            # starts on, so a class body's own statements can later be
+            # looked up by line (see CodeGenerator._resolve_gotos, used to
+            # resolve `goto ln: N;`). Tagging it here unconditionally
+            # (rather than only when is_class_body) is simpler than
+            # branching, and is harmless for nested if/while/for/try
+            # bodies where nothing reads .line.
+            start_line = self._peek().line
+            if (
+                not is_class_body
+                and not allows_goto
+                and self._peek().type == TokenType.IDENTIFIER
+                and self._peek().value == "goto"
+            ):
+                raise ParseError(
+                    "'goto' can only be used at the top level of a class "
+                    "body or directly inside an if/elseif/else, not nested "
+                    "inside while/for/try/catch",
+                    self._peek().line,
+                    self._peek().column,
+                )
+            statement = self._parse_statement(allows_goto=is_class_body or allows_goto)
+            statement.line = start_line
+            statements.append(statement)
         self._expect(TokenType.RBRACE)
         return statements
 

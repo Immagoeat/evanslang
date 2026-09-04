@@ -11,6 +11,7 @@ from nodes.nodes import (
     ExpressionStatement,
     FloatLiteral,
     ForStatement,
+    GotoStatement,
     Identifier,
     IfStatement,
     IndexAssignment,
@@ -52,16 +53,47 @@ from utils.runtime import (
 MAX_CALL_DEPTH = 200
 
 
+class _Goto(Exception):
+    # Internal control-flow signal, not an EvansLangError - a goto ln: N;
+    # inside a nested if/elseif/else body needs to unwind out of however
+    # many recursive _execute() calls are between it and _run_class's own
+    # top-level statement loop (the only place that knows how to find
+    # line N and resume from there); raising through Python's own
+    # exception machinery is the simplest way to do that unwind. The
+    # parser already guarantees goto only ever appears at a class body's
+    # top level or directly inside if/elseif/else (never while/for/try/
+    # catch - see parser.py's allows_goto threading), so this never needs
+    # to propagate through a while/for loop or try/except's own state.
+    def __init__(self, target_line: int):
+        self.target_line = target_line
+
+
 class Interpreter:
     def __init__(self):
         self.variables = {}
         self.call_depth = 0
+        # Cache of class name -> {source_line: index into that class's own
+        # body list}, built lazily on first goto - mirrors codegen.py's
+        # line_map (built once per class at compile time) but here it's
+        # just a dict of already-parsed AST nodes, so there's no
+        # compilation step to piggyback the map-building onto.
+        self._line_maps: dict[str, dict[int, int]] = {}
 
     def run(self, resolved: ResolvedProgram):
         self.classes = resolved.classes
         if "init" in self.classes:
             self._run_class("init")
         self._run_class(resolved.entry)
+
+    def _line_map_for(self, name: str) -> dict[int, int]:
+        line_map = self._line_maps.get(name)
+        if line_map is None:
+            line_map = {
+                statement.line: index
+                for index, statement in enumerate(self.classes[name].body)
+            }
+            self._line_maps[name] = line_map
+        return line_map
 
     def _run_class(self, name: str) -> None:
         if self.call_depth >= MAX_CALL_DEPTH:
@@ -71,8 +103,21 @@ class Interpreter:
             )
         self.call_depth += 1
         try:
-            for statement in self.classes[name].body:
-                self._execute(statement)
+            body = self.classes[name].body
+            index = 0
+            while index < len(body):
+                try:
+                    self._execute(body[index])
+                except _Goto as goto:
+                    target_index = self._line_map_for(name).get(goto.target_line)
+                    if target_index is None:
+                        raise EvansLangError(
+                            f"goto ln: {goto.target_line} does not match "
+                            f"any top-level statement in class {name!r}"
+                        )
+                    index = target_index
+                    continue
+                index += 1
         finally:
             self.call_depth -= 1
 
@@ -205,6 +250,8 @@ class Interpreter:
                 )
             play_ascii_video(path)
             return
+        if isinstance(node, GotoStatement):
+            raise _Goto(node.target_line)
         raise NotImplementedError(f"Cannot execute node: {node!r}")
 
     def _evaluate(self, node):

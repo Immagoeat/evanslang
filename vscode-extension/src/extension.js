@@ -1,6 +1,6 @@
 const vscode = require("vscode");
 
-const KEYWORDS = ["class", "var", "list", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "ment", "mentions"];
+const KEYWORDS = ["class", "var", "list", "if", "elseif", "else", "while", "for", "try", "catch", "throw", "goto", "ment", "mentions"];
 const TYPES = ["int", "str", "float", "bool", "ptr"];
 const BUILTINS = ["print", "input", "ascii", "video"];
 const BOOLEAN_LITERALS = ["true", "false"];
@@ -127,6 +127,11 @@ function snippetCompletions() {
   const throwStmt = new vscode.CompletionItem("throw", vscode.CompletionItemKind.Snippet);
   throwStmt.insertText = new vscode.SnippetString('throw "${1:message}";');
   items.push(throwStmt);
+
+  const gotoStmt = new vscode.CompletionItem("goto", vscode.CompletionItemKind.Snippet);
+  gotoStmt.insertText = new vscode.SnippetString("goto ln: ${1:1};");
+  gotoStmt.detail = "goto ln: <line number>; - jump to a top-level statement in this class";
+  items.push(gotoStmt);
 
   const ptrDecl = new vscode.CompletionItem("ptr", vscode.CompletionItemKind.Snippet);
   ptrDecl.insertText = new vscode.SnippetString(

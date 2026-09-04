@@ -64,3 +64,47 @@ def test_list_index_and_append_match_vm_behavior():
         "}"
     )
     assert lines == ["[9, 2, 3, 4]", "4"]
+
+
+def test_goto_conditional_loop_matches_vm_behavior():
+    source = (
+        "class main() {\n"          # line 1
+        "var i: int = 0;\n"         # line 2
+        "print(i);\n"               # line 3
+        "i += 1;\n"                 # line 4
+        "if (i < 3) {\n"            # line 5
+        "goto ln: 3;\n"             # line 6
+        "}\n"                       # line 7
+        'print("done");\n'         # line 8
+        "}"
+    )
+    lines = build_run_capture(source)
+    assert lines == ["0", "1", "2", "done"]
+
+
+def test_goto_forward_skips_statements():
+    source = (
+        "class main() {\n"           # line 1
+        'print("start");\n'         # line 2
+        "goto ln: 5;\n"              # line 3
+        'print("skipped");\n'       # line 4
+        'print("landed");\n'        # line 5
+        "}"
+    )
+    lines = build_run_capture(source)
+    assert lines == ["start", "landed"]
+
+
+def test_goto_to_undefined_line_raises_clean_error():
+    import pytest
+
+    from utils.errors import EvansLangError
+
+    source = (
+        "class main() {\n"
+        'print("a");\n'
+        "goto ln: 99;\n"
+        "}"
+    )
+    with pytest.raises(EvansLangError):
+        build_run_capture(source)

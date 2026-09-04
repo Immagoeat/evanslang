@@ -593,3 +593,94 @@ def test_video_terminates_audio_process_on_mid_playback_error(monkeypatch):
 
     assert fake_process.terminated is True
     assert fake_process.waited is False
+
+
+def test_goto_conditional_loop():
+    source = (
+        "class main() {\n"          # line 1
+        "var i: int = 0;\n"         # line 2
+        "print(i);\n"               # line 3
+        "i += 1;\n"                 # line 4
+        "if (i < 3) {\n"            # line 5
+        "goto ln: 3;\n"             # line 6
+        "}\n"                       # line 7
+        'print("done");\n'         # line 8
+        "}"
+    )
+    lines = build_run_capture(source)
+    assert lines == ["0", "1", "2", "done"]
+
+
+def test_goto_forward_skips_statements():
+    source = (
+        "class main() {\n"           # line 1
+        'print("start");\n'         # line 2
+        "goto ln: 5;\n"              # line 3
+        'print("skipped");\n'       # line 4
+        'print("landed");\n'        # line 5
+        "}"
+    )
+    lines = build_run_capture(source)
+    assert lines == ["start", "landed"]
+
+
+def test_goto_inside_nested_if():
+    source = (
+        "class main() {\n"                # line 1
+        "if (true) {\n"                   # line 2
+        "if (true) {\n"                   # line 3
+        "goto ln: 8;\n"                   # line 4
+        "}\n"                             # line 5
+        "}\n"                             # line 6
+        'print("skipped");\n'            # line 7
+        'print("target");\n'             # line 8
+        "}"
+    )
+    lines = build_run_capture(source)
+    assert lines == ["target"]
+
+
+def test_goto_to_undefined_line_raises_clean_error():
+    source = (
+        "class main() {\n"
+        'print("a");\n'
+        "goto ln: 99;\n"
+        "}"
+    )
+    with pytest.raises(EvansLangError):
+        build_and_run(source)
+
+
+def test_goto_cannot_target_another_class():
+    source = (
+        "class helper() {\n"       # line 1
+        'print("in helper");\n'   # line 2
+        "}\n"
+        "class main() {\n"
+        'print("start");\n'
+        "helper;\n"
+        "goto ln: 2;\n"
+        "}"
+    )
+    with pytest.raises(EvansLangError):
+        build_and_run(source)
+
+
+def test_goto_backward_error_is_catchable_by_try_after_it():
+    # A goto that lands on an invalid line is a build-time error raised
+    # from codegen, well before the VM (and any try/catch inside it) ever
+    # runs - this documents that goto errors are NOT runtime/catchable,
+    # unlike almost every other EvansLangError in the language.
+    source = (
+        "class main() {\n"
+        "try {\n"
+        'print("a");\n'
+        "}\n"
+        "catch (e: str) {\n"
+        'print(e);\n'
+        "}\n"
+        "goto ln: 999;\n"
+        "}"
+    )
+    with pytest.raises(EvansLangError):
+        build_and_run(source)
