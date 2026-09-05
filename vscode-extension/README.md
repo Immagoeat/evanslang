@@ -22,18 +22,17 @@ reasonable; revisit if the language keeps growing.
 ## Installing locally
 
 This extension isn't published to the Marketplace. To install it into your
-own VS Code:
+own VS Code, package it as a `.vsix` and install that:
 
 ```bash
-EXT_DIR="$HOME/.vscode/extensions/evanslang-local.evanslang-0.1.0"
-mkdir -p "$EXT_DIR"
-cp -r vscode-extension/* "$EXT_DIR"/
+cd vscode-extension
+npx --yes @vscode/vsce package --allow-missing-repository -o /tmp/evanslang-0.1.0.vsix
+code --install-extension /tmp/evanslang-0.1.0.vsix
 ```
 
-Then reload the window (Command Palette → "Developer: Reload Window", or
-just restart VS Code) so it picks up the new extension.
+Then reload the window (Command Palette → "Developer: Reload Window").
 
 ## After changing the grammar or extension.js
 
-Re-run the copy step above, then reload the window again — VS Code doesn't
-hot-reload grammars or extension code from a live install.
+Re-run the two commands above, then reload the window — VS Code doesn't
+hot-reload grammars or extension code from an installed extension.
